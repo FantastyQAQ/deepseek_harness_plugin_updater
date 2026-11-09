@@ -1,0 +1,11 @@
+<RCC>
+    <qresource prefix="/docs">
+        <file alias="README.zh_CN.md">docs/README.zh_CN.md</file>
+    </qresource>
+    <qresource prefix="/icon">
+        <file alias="app_256.ico">icon/app_256.ico</file>
+    </qresource>
+    <qresource prefix="/scripts">
+        <file alias="npm_dist_tags.js">scripts/npm_dist_tags.js</file>
+    </qresource>
+</RCC>

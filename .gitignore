@@ -1,0 +1,63 @@
+# ---- Qt / qmake 构建产物 ----
+debug/
+release/
+build/
+build-*/
+Makefile*
+.qmake.stash
+object_script.*
+moc_*
+*.moc
+qrc_*.cpp
+ui_*.h
+*.pro.user
+*.pro.user.*
+
+# ---- 编译中间文件 / 链接产物 ----
+*.o
+*.obj
+*.res
+*.rc.o
+*.exe
+*.dll
+*.a
+*.lib
+*.exp
+*.ilk
+*.pdb
+*.map
+
+# ---- 编译缓存 / 静态分析 ----
+*.gch
+*.pch
+compile_commands.json
+.cache/
+.ccache/
+
+# ---- 运行期与本地产物 ----
+*.log
+*.bak
+*.bak-*
+*.orig
+*.rej
+*.tmp
+*.swp
+*~
+.screenshots/
+
+# ---- 编辑器 / IDE ----
+.vscode/
+.idea/
+.trae/
+
+# ---- 操作系统杂项 ----
+Thumbs.db
+ehthumbs.db
+desktop.ini
+.DS_Store
+
+# ---- 打包产物（Enigma Virtual Box 免安装包，随仓库分发）----
+# 上面的 *.exe / *.dll 规则针对编译产物；pack/ 下是打包好可直接运行的
+# 便携版（exe + Qt 运行库），需要进版本库，这里做例外放行。
+!pack/
+!pack/**
