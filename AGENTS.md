@@ -159,16 +159,16 @@
 ```cmd
 set PATH=D:\SW\Qt5.12.8\5.12.8\mingw73_32\bin;D:\SW\Qt5.12.8\Tools\mingw730_32\bin;C:\Windows\system32;C:\Windows
 D:\SW\Qt5.12.8\5.12.8\mingw73_32\bin\qmake.exe dsh_plugin_updater.pro -spec win32-g++
-mingw32-make.exe -j4 release
+mingw32-make.exe -j4
 ```
 
 也可以在 Qt Creator 里直接构建（Qt Creator 不带 `sh.exe`，不受该问题影响）。
 
 **编译目录固定为 `release/`**（不要用 `debug/`）：
 
-- qmake 生成的 Makefile 首个默认目标就是 `release`，显式写 `mingw32-make release` 只是让意图明确；
+- `.pro` 已禁用 `debug_and_release`，qmake 只生成单个 Makefile，默认目标为 `all`，直接 `mingw32-make -j4` 即可；
 - 全部中间产物（`*.o`、`moc_*`、`qrc_*.cpp`、`dsh_plugin_updater_resource_res.o`）与最终产物 `release/dsh_plugin_updater.exe` 都落在 `release/`；
-- `debug/` 不参与构建，也不要手动 `mingw32-make debug`——那会另生成一整套 debug 对象文件，与 release 对象混用时容易链错；
+- `debug/` 不参与构建；
 - `release/`、`debug/`、`Makefile*`、`.qmake.stash` 均已被 `.gitignore` 忽略。
 
 **坑（已实测）**：不要用 `D:/sw/mingw64/bin/mingw32-make.exe`——它是 64 位工具链，链接阶段会报一堆 `undefined reference to __ZTVN10__cxxabiv120__si_class_type_infoE` / `_strcmp` / `__ZdlPvj` 以及 `undefined reference to WinMain`。同理必须先把 32 位 mingw 的 bin 目录放进 `PATH`，让 Makefile 里的 `g++` 解析到 i686 版本，否则清空生成物后仍会链错。

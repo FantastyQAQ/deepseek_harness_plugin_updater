@@ -31,14 +31,14 @@ extern "C" {
 #define APP_COPYRIGHT_YEAR  "2026"
 
 // 显示用的简短版本号字符串（窗口标题、关于对话框都用这个）
-#define APP_VERSION         "SV01.007"
+#define APP_VERSION         "SV01.008"
 
 // 数字版本号（exe 属性里的「文件版本 / 产品版本」用，四段：主.次.补丁.构建）
 //   必须与上面的 APP_VERSION 同步：末三位一一对应（如 SV01.002 对应 1,0,0,2）
-#define APP_VERSION_NUM     1,0,0,7
+#define APP_VERSION_NUM     1,0,0,8
 
-// 构建日期标签（形如 261109，即 26 年 11 月 09 日）
-#define APP_BUILD_DATE      "261109"
+// 构建日期标签（形如 261110，即 26 年 11 月 10 日）
+#define APP_BUILD_DATE      "261110"
 
 /* ===== 完整标题 ===== */
 #define APP_FULL_TITLE      APP_NAME " " APP_VERSION " [" APP_BUILD_DATE "]"

@@ -4,6 +4,20 @@ TARGET    = dsh_plugin_updater
 TEMPLATE  = app
 CONFIG   += c++17
 
+# 只生成 release Makefile；避免 clean 时尝试清理不存在的 debug 产物而刷屏「找不到」
+CONFIG   -= debug debug_and_release
+CONFIG   += release
+
+# 禁用 debug_and_release 后 qmake 默认把中间产物放到根目录，这里显式保持 release/ 目录约定
+DESTDIR     = release
+OBJECTS_DIR = release
+MOC_DIR     = release
+RCC_DIR     = release
+UI_DIR      = release
+
+# clean 时文件不存在属于正常情况，屏蔽 Windows del 的「找不到」错误输出
+QMAKE_DEL_FILE = del 2>nul
+
 # 源码与头文件统一放在 user 目录下
 SOURCES += user/src/main.cpp \
            user/src/mainwindow.cpp \
