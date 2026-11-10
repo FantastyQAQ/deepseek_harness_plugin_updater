@@ -22,7 +22,7 @@ extern "C" {
 #define APP_ORIGINAL_FILENAME  "dsh_plugin_updater.exe"
 
 // 发布者（VERSIONINFO CompanyName / LegalCopyright 用）
-#define APP_AUTHOR_NAME     "欧力 / lch"
+#define APP_AUTHOR_NAME     "lch"
 
 // 邮箱
 #define APP_AUTHOR_MAIL     "fantasylch@foxmail.com"

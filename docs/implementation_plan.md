@@ -84,7 +84,7 @@ mkdir -p "$PROJ/user/inc" "$PROJ/user/src" "$PROJ/docs" "$PROJ/icon" "$PROJ/rele
 
 #define APP_NAME              "DSH 插件更新工具"
 #define APP_ORIGINAL_FILENAME "dsh_plugin_updater.exe"
-#define APP_AUTHOR_NAME       "欧力 / lch"
+#define APP_AUTHOR_NAME       "lch"
 #define APP_AUTHOR_MAIL       "fantasylch@foxmail.com"
 #define APP_COPYRIGHT_YEAR    "2026"
 #define APP_VERSION           "SV01.000"
