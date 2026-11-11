@@ -224,30 +224,37 @@ release/ debug/                  构建产物（已被 .gitignore 忽略）
 | `user/src/aboutdialog.cpp` | 模态「关于」对话框 |
 | `user/src/updatenotesdialog.cpp` | 非模态「更新说明」窗口，读 `:/docs/README.zh_CN.md` 并做极简 Markdown→HTML |
 
-### 每次改动必须同步的版本信息（强制）
+### 版本号维护（只在发布时升版）
 
-**只要这次任务改动了程序行为（功能、修复、界面、文档资源），交付前必须把下面三个宏一起改掉**，改完重新编译。这三个宏在 `user/inc/appinfo.h`，是全工程版本信息的唯一来源，漏改任何一处都会出现「窗口标题 / 关于对话框 / exe 属性」三处版本不一致。
+`user/inc/appinfo.h` 里三个宏的职责与更新时机不同，不要一改代码就无脑升版：
 
-| 宏 | 位置 | 含义 | 改法 |
-|----|------|------|------|
-| `APP_VERSION` | `user/inc/appinfo.h:34` | 显示用短版本号，如 `SV01.000` | 递增末三位（`SV01.001`、`SV01.002`…） |
-| `APP_VERSION_NUM` | `user/inc/appinfo.h:38` | exe 属性里的四段数字版本，如 `1,0,0,0` | **必须与 `APP_VERSION` 同步**：`SV01.000` ↔ `1,0,0,0`，`SV01.001` ↔ `1,0,0,1` |
-| `APP_BUILD_DATE` | `user/inc/appinfo.h:41` | 构建日期标签，`yyMMdd` 形如 `261109` | 改成当天日期（26 年 11 月 09 日 → `261109`） |
+- `APP_VERSION`：显示版本号 `SV01.NNN`。**只在发布版本时**递增末三位（如 `SV01.001` → `SV01.002`）。
+- `APP_VERSION_NUM`：数字版本号，必须与 `APP_VERSION` 末三位一一对应（`SV01.002` → `1,0,0,2`），与 `APP_VERSION` 同时改。
+- `APP_BUILD_DATE`：构建日期 `YYMMDD`。**每次改代码都更新**为当天日期（如 `261110` 即 2026-11-10），用来区分同版本号的多次构建。
 
-派生关系（改上面三个就够，别去动这些）：
+判定规则：
+
+- **算发布**：用户明确说「发版 / 发布 / 升版本 / 打个版本」，或要交付可直接分发的 exe → 同时改 `APP_VERSION`、`APP_VERSION_NUM`，并把 `APP_BUILD_DATE` 设为发布当天。
+- **算小改动**：功能微调、bug 修复、注释与文案、界面细节、重构等日常改动 → 三个宏都保持原值，不动版本号。
+- **只改文档**（`AGENTS.md`、`README.md`、`docs/` 等）而不动代码 → 三个宏都不改。
+
+拿不准是否算发布时，按小改动处理，并在收尾时提醒用户「本次未升版本号，如需发版请告知」。
+
+本工程对应：三个宏均在 `user/inc/appinfo.h`，名称与通用规则一致。
+
+派生关系与构建联动（改上面三个就够，别去动这些）：
 
 - `APP_FULL_TITLE` = `APP_NAME " " APP_VERSION " [" APP_BUILD_DATE "]"`，用于主窗口标题。
 - `APP_PRODUCT_VERSION` = `APP_VERSION " [" APP_BUILD_DATE "]"`，用于 exe 属性里的「产品版本」。
 - `dsh_plugin_updater_resource.rc` 直接 `#include "user/inc/appinfo.h"`，`FILEVERSION` / `PRODUCTVERSION` 取 `APP_VERSION_NUM`，`FileVersion` 取 `APP_VERSION`，`ProductVersion` 取 `APP_PRODUCT_VERSION`——所以三个宏一改，exe 属性自动跟着变，不用手改 .rc。
 - `.pro` 的 `QMAKE_PRE_LINK` 会在**每次链接前**重跑 windres 生成 `$(RES_FILE)`，因此只改宏、不做完整重编也能让 exe 属性刷新；但源码改动仍需正常编译。
-
-同时按「README 更新」一节，在 `docs/README.zh_CN.md` 追加一条当次更新记录（该文件编进资源，需重编才在「更新说明」窗口里可见）。
+- 发版改宏后按「README 更新」一节，在 `docs/README.zh_CN.md` 追加一条当次更新记录（该文件编进资源，需重编才在「更新说明」窗口里可见）。
 
 ### 本项目特有约定
 
 - **更新记录位置**：本工程的更新记录在 `docs/README.zh_CN.md`（不是根目录 `README.zh_CN.md`），且该文件被编进资源供「更新说明」窗口读取，所以改完必须重新编译才生效。条目格式为 `- SV01.000: 一句话说明`。
 - **不是 Git 仓库**：工程根目录没有 `.git`，`git status` / `git diff` 会直接报错，别把版本管理当成可用的验证手段。
-- **版本号**：见上一节「每次改动必须同步的版本信息」，三个宏必须一起改。
+- **版本号**：见上一节「版本号维护（只在发布时升版）」，只在发布时升版。
 - **注释风格**：源文件用 Doxygen 注释（`@file` / `@brief` / `@param` / `@return`），头文件只写单行说明。
 - **Qt 5.12 兼容**：用 `QString::SkipEmptyParts`，不要用 Qt 5.14+ 的 `Qt::SkipEmptyParts`。
 - **进程调用**：`.cmd` 文件必须经 `cmd.exe /d /c` 包装；中止时用 `taskkill /T /F` 杀整棵进程树（cmd → node → pnpm），避免残留孤儿进程。
