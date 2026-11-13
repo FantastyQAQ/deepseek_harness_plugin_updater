@@ -35,6 +35,7 @@ struct PluginInfo
     // ---- 远端最新版（npm view 查询结果）----
     QString latestVersion;       ///< npm 最新版本（空 = 未查询到）
     QDateTime latestTime;        ///< 最新版本的发布时间（registry time 表；无效 = 未拿到）
+    QString usableVersion;       ///< 可用最新版：最新版已满 24h 则同 latestVersion，否则为满 24h 的最新稳定版（空 = 无）
     bool latestChecked;           ///< 是否已查询过最新版本
     bool latestFailed;            ///< 查询失败标记
     QString latestError;         ///< 查询失败原因
@@ -84,6 +85,10 @@ public:
     /// @brief 插件列表（扫描完成后有效）
     const QVector<PluginInfo> &plugins() const { return m_plugins; }
 
+    /// @brief 按数字段比较两个 x.y.z 版本号
+    /// @return a 更新返回正数，相等返回 0，更旧返回负数
+    static int compare_versions(const QString &a, const QString &b);
+
 signals:
     /// @brief 日志消息
     void log_message(const QString &text, const QColor &color);
@@ -97,9 +102,9 @@ signals:
     /// @brief 查询进度（done = 已完成个数，0..total）
     void query_progress(int done, int total);
 
-    /// @brief 单个插件查询完成（latestVersion 空 = 失败，原因在 error；latestTime 为最新版发布时间）
+    /// @brief 单个插件查询完成（latestVersion 空 = 失败，原因在 error；latestTime 为最新版发布时间；usableVersion 为可用最新版）
     void query_result(int index, const QString &latestVersion, const QString &error,
-                      const QDateTime &latestTime);
+                      const QDateTime &latestTime, const QString &usableVersion);
 
     /// @brief 查询批次结束
     void query_finished(bool aborted);

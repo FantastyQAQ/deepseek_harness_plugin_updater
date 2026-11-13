@@ -12,11 +12,14 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QFont>
+#include <QFontMetrics>
+#include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QMenu>
 #include <QMessageBox>
 #include <QProcess>
+#include <QScreen>
 #include <QSet>
 #include <QSplitter>
 #include <QStandardPaths>
@@ -27,6 +30,8 @@
 #include <QTimer>
 #include <QUrl>
 #include <QVBoxLayout>
+
+#include <algorithm>
 
 #include "aboutdialog.h"
 #include "appinfo.h"
@@ -39,6 +44,24 @@ const QColor kColorOk(0x15, 0x94, 0x47);        ///< 成功绿
 const QColor kColorWarn(0xd5, 0x6a, 0x16);      ///< 提醒橙
 const QColor kColorErr(Qt::red);                ///< 错误红
 const QColor kColorDim(0x8a, 0x93, 0xa3);       ///< 弱化灰
+
+const int kCellPadding = 24;           ///< 列宽余量：单元格左右内边距（QSS 各 7px）加富余
+const int kWindowChromeWidth = 90;     ///< 窗口非表格区宽度：左右边距、面板边距、滚动条与边框
+const int kWindowDefaultHeight = 1200; ///< 默认窗口高度
+
+/**
+ * @brief 按字体量出一列的宽度：取表头与各样例文本中最宽者，再加单元格内边距。
+ * @param fm 表格所用字体的度量
+ * @param texts 表头文字与代表性样例内容
+ * @return 列宽（像素）
+ */
+int fit_column(const QFontMetrics &fm, const QStringList &texts)
+{
+    int widest = 0;
+    for (const QString &text : texts)
+        widest = std::max(widest, fm.horizontalAdvance(text));
+    return widest + kCellPadding;
+}
 } // namespace
 
 // ===== 构造 / 析构 =====
@@ -67,7 +90,7 @@ MainWindow::MainWindow(QWidget *parent)
     // 记住窗口标题基名，操作时在后面追加动态信息
     m_summaryLabel->setText(QStringLiteral("就绪 — 点击「开始扫描」索引 DSH 插件"));
 
-    resize(1180, 720);
+    resize(default_window_size());
     setMinimumSize(860, 520);
 }
 
@@ -366,6 +389,7 @@ void MainWindow::setup_table_panel(QSplitter *splitter)
         QStringLiteral("Profile"),
         QStringLiteral("安装源"),
         QStringLiteral("现版本"),
+        QStringLiteral("可用最新版本"),
         QStringLiteral("最新版本"),
         QStringLiteral("状态"),
         QStringLiteral("安装目录"),
@@ -385,14 +409,27 @@ void MainWindow::setup_table_panel(QSplitter *splitter)
     for (int c = 0; c < ColCount; ++c)
         header->setSectionResizeMode(c, QHeaderView::Interactive);
     header->setStretchLastSection(false);
+    // 默认列宽按表格字体量出样例文本宽度（见 fit_column），保证默认打开时各列内容完整显示
+    const QFontMetrics fm(m_table->font());
     m_table->setColumnWidth(ColCheck, 38);
-    m_table->setColumnWidth(ColName, 500);
-    m_table->setColumnWidth(ColProfile, 150);
-    m_table->setColumnWidth(ColSource, 110);
-    m_table->setColumnWidth(ColInstalled, 90);
-    m_table->setColumnWidth(ColLatest, 90);
-    m_table->setColumnWidth(ColStatus, 260);
-    m_table->setColumnWidth(ColDir, 1000);
+    m_table->setColumnWidth(ColName, fit_column(fm, {QStringLiteral("插件名称"),
+                                                     QStringLiteral("@linxin666/dsh-client-ui-skill-explorer")}));
+    m_table->setColumnWidth(ColProfile, fit_column(fm, {QStringLiteral("Profile"),
+                                                        QStringLiteral("desktop")}));
+    m_table->setColumnWidth(ColSource, fit_column(fm, {QStringLiteral("安装源"),
+                                                       QStringLiteral("github:FantastyQAQ/dsh-doxygen")}));
+    m_table->setColumnWidth(ColInstalled, fit_column(fm, {QStringLiteral("现版本"),
+                                                          QStringLiteral("1.73.17")}));
+    m_table->setColumnWidth(ColLatest, fit_column(fm, {QStringLiteral("最新版本"),
+                                                       QStringLiteral("1.73.19")}));
+    m_table->setColumnWidth(ColStatus, fit_column(fm, {QStringLiteral("状态"),
+                                                       QStringLiteral("可更新（最新版 24h 后可装）"),
+                                                       QStringLiteral("已是最新"),
+                                                       QStringLiteral("已更新，重启 DSH 生效")}));
+    m_table->setColumnWidth(ColUsable, fit_column(fm, {QStringLiteral("可用最新版本"),
+                                                       QStringLiteral("1.73.19")}));
+    m_table->setColumnWidth(ColDir, fit_column(fm, {QStringLiteral("安装目录"),
+                                                    QStringLiteral("C:\\Users\\lch_w\\.dsh\\profiles\\desktop\\node_modules\\@linxin666\\dsh-client-ui-skill-explorer")}));
     m_table->setWordWrap(false);
 
     connect(m_table, &QTableWidget::itemChanged, this, &MainWindow::on_table_item_changed);
@@ -438,8 +475,8 @@ void MainWindow::setup_legend(QVBoxLayout *top)
     m_legend->setTextFormat(Qt::RichText);
     m_legend->setText(QStringLiteral(
         "<span style='color:#159447;'>●</span> 已是最新 &nbsp;&nbsp;"
-        "<span style='color:#d56a16;'>●</span> 可更新 &nbsp;&nbsp;"
-        "<span style='color:#7c8798;'>●</span> 可更新（24h 后可装，DSH 暂缓安装刚发布的版本） &nbsp;&nbsp;"
+        "<span style='color:#d56a16;'>●</span> 可更新（最新版未满 24h 时改装满 24h 的可用版） &nbsp;&nbsp;"
+        "<span style='color:#7c8798;'>●</span> 最新版 24h 后可装 &nbsp;&nbsp;"
         "<span style='color:#7c8798;'>●</span> 无法检查（Git 源 / 查询失败） &nbsp;&nbsp;"
         "<span style='color:#bf8b09;'>●</span> 更新中 / 其他"));
     top->addWidget(m_legend);
@@ -527,36 +564,15 @@ void MainWindow::on_update_all()
     if (m_scanning || m_querying || m_updating)
         return;
 
-    // "一键更新全部" = 勾选所有可更新（npm 源且版本落后）的插件；
-    // 最新版发布不足 24h 的项跳过——现在装只会空跑（DSH minimumReleaseAge 策略）
+    // "一键更新全部" = 勾选所有可更新（有可用版本且比已装版本新）的插件；
+    // 最新版未满 24h 的项也纳入，更新时改装其满 24h 的可用版本
     QVector<int> indices;
-    int skippedFresh = 0;
-    for (int r = 0; r < m_table->rowCount(); ++r) {
-        const PluginInfo &info = m_plugins.at(r);
-        const QTableWidgetItem *latestItem = m_table->item(r, ColLatest);
-        const bool outdated = (info.sourceType == SourceNpm)
-                              && latestItem && !latestItem->text().isEmpty()
-                              && latestItem->text() != QStringLiteral("—")
-                              && info.installedVersion != latestItem->text();
-        if (!outdated)
-            continue;
-        if (is_release_too_fresh(info)) {
-            ++skippedFresh;
-            continue;
-        }
-        indices.append(r);
-    }
+    for (int r = 0; r < m_table->rowCount(); ++r)
+        if (needs_update(m_plugins.at(r)))
+            indices.append(r);
 
     if (indices.isEmpty()) {
-        if (skippedFresh > 0) {
-            append_log(QStringLiteral(
-                           "没有现在就能更新的插件：%1 个插件的最新版发布不足 24 小时，"
-                           "DSH 会暂缓安装（minimumReleaseAge = 24h），满 24 小时后再试。")
-                           .arg(skippedFresh),
-                       kColorWarn);
-        } else {
-            append_log(QStringLiteral("没有检测到可更新的插件（已是最新）"), kColorOk);
-        }
+        append_log(QStringLiteral("没有检测到可更新的插件（已是可用最新）"), kColorOk);
         return;
     }
 
@@ -665,6 +681,12 @@ void MainWindow::on_scan_list_ready(int scanId, const QVector<PluginInfo> &plugi
             info.sourceType == SourceNpm ? QStringLiteral("查询中…") : QStringLiteral("—"));
         m_table->setItem(i, ColLatest, latestItem);
 
+        // 可用最新版本列与最新版本列同步：npm 源待查询，Git 源标灰
+        m_table->setItem(i, ColUsable,
+                         new QTableWidgetItem(info.sourceType == SourceNpm
+                                                  ? QStringLiteral("查询中…")
+                                                  : QStringLiteral("—")));
+
         auto *statusItem = new QTableWidgetItem(
             info.sourceType == SourceNpm ? QStringLiteral("等待查询")
                                          : QStringLiteral("Git 源，无法自动检查"));
@@ -727,51 +749,67 @@ void MainWindow::on_query_progress(int done, int total)
 }
 
 void MainWindow::on_query_result(int index, const QString &latestVersion, const QString &error,
-                                 const QDateTime &latestTime)
+                                 const QDateTime &latestTime, const QString &usableVersion)
 {
     if (index < 0 || index >= m_table->rowCount())
         return;
 
     auto *latestItem = m_table->item(index, ColLatest);
+    auto *usableItem = m_table->item(index, ColUsable);
     auto *statusItem = m_table->item(index, ColStatus);
-    if (!latestItem || !statusItem)
+    if (!latestItem || !usableItem || !statusItem)
         return;
 
-    if (!latestVersion.isEmpty()) {
-        // 同步发布时间到本地数据副本（is_release_too_fresh 判断要用）
-        if (index < m_plugins.size())
-            m_plugins[index].latestTime = latestTime;
-
-        latestItem->setText(latestVersion);
-
-        const QString installed = m_plugins.at(index).installedVersion;
-        if (installed.isEmpty() || installed == latestVersion) {
-            statusItem->setText(QStringLiteral("已是最新"));
-            statusItem->setForeground(kColorOk);
-            return;
-        }
-
-        if (is_release_too_fresh(m_plugins.at(index))) {
-            // 最新版发布不足 24 小时：DSH 安装策略（minimumReleaseAge）会把它当作
-            // 不存在，现在更新只会空跑。明确标注、不预勾选，避免"更新成功但版本没变"
-            statusItem->setText(QStringLiteral("可更新（24h 后可装）"));
-            statusItem->setForeground(kColorDim);
-            latestItem->setToolTip(QStringLiteral(
-                "最新版 %1 发布于 %2，发布不足 24 小时。\n"
-                "DSH 的安装策略（minimumReleaseAge = 24h）会暂缓安装刚发布的版本，\n"
-                "满 24 小时后再更新才能真正装上。")
-                .arg(latestVersion,
-                     latestTime.toLocalTime().toString(QStringLiteral("yyyy-MM-dd HH:mm"))));
-        } else {
-            statusItem->setText(QStringLiteral("可更新"));
-            statusItem->setForeground(kColorWarn);
-            m_table->item(index, ColCheck)->setCheckState(Qt::Checked); // 默认勾选可更新项
-        }
-    } else {
+    if (latestVersion.isEmpty()) {
+        // 查询失败：版本两列标「—」，状态列显示失败原因
         latestItem->setText(QStringLiteral("—"));
+        usableItem->setText(QStringLiteral("—"));
         statusItem->setText(error.isEmpty() ? QStringLiteral("无法检查") : error);
         statusItem->setForeground(kColorDim);
+        return;
     }
+
+    if (index >= m_plugins.size())
+        return;
+
+    // 同步查询结果到本地数据副本（更新目标与统计要用）
+    PluginInfo &info = m_plugins[index];
+    info.latestVersion = latestVersion;
+    info.latestTime = latestTime;
+    info.usableVersion = usableVersion;
+
+    latestItem->setText(latestVersion);
+    usableItem->setText(usableVersion.isEmpty() ? QStringLiteral("—") : usableVersion);
+
+    const bool pending = is_release_pending(info);
+    if (needs_update(info)) {
+        // 可更新：默认勾选；最新版未满 24h 时更新的是其可用版本
+        statusItem->setText(pending ? QStringLiteral("可更新（最新版 24h 后可装）")
+                                    : QStringLiteral("可更新"));
+        statusItem->setForeground(kColorWarn);
+        m_table->item(index, ColCheck)->setCheckState(Qt::Checked);
+    } else if (pending) {
+        // 最新版未满 24h 且没有比已装版本更新的可用版：只能等满 24h
+        statusItem->setText(QStringLiteral("最新版 24h 后可装"));
+        statusItem->setForeground(kColorDim);
+    } else {
+        statusItem->setText(QStringLiteral("已是最新"));
+        statusItem->setForeground(kColorOk);
+    }
+
+    if (!pending) {
+        latestItem->setToolTip(QString());
+        return;
+    }
+    // 悬停说明：最新版为何暂不可装，以及本次会改装哪个版本
+    const QString when = latestTime.toLocalTime().toString(QStringLiteral("yyyy-MM-dd HH:mm"));
+    latestItem->setToolTip(usableVersion.isEmpty()
+        ? QStringLiteral("最新版 %1 发布于 %2，未满 24 小时，DSH 暂缓安装。\n"
+                         "暂无满 24 小时的可用版本，请稍后再更新。")
+              .arg(latestVersion, when)
+        : QStringLiteral("最新版 %1 发布于 %2，未满 24 小时，DSH 暂缓安装。\n"
+                         "更新时将安装满 24 小时的可用版本 %3。")
+              .arg(latestVersion, when, usableVersion));
 }
 
 void MainWindow::on_query_finished(bool aborted)
@@ -780,35 +818,25 @@ void MainWindow::on_query_finished(bool aborted)
     m_progress->setVisible(false);
     m_stopBtn->setEnabled(false);
 
-    // 统计可更新数量（勾选数即默认可更新数）：
-    // 「可更新（24h 后可装）」的项不计入——它现在更新只会空跑，不算真正可更新
+    // 统计可更新数量（即默认勾选数）；最新版未满 24h 的项另行汇总说明
     int updatable = 0;
-    int fresh = 0; // 最新版发布不足 24h、暂不可安装的项数
-    for (int r = 0; r < m_table->rowCount(); ++r) {
-        const PluginInfo &info = m_plugins.at(r);
-        const QTableWidgetItem *latestItem = m_table->item(r, ColLatest);
-        if (info.sourceType != SourceNpm || !latestItem || latestItem->text().isEmpty()
-            || latestItem->text() == QStringLiteral("—")
-            || latestItem->text() == QStringLiteral("查询中…")
-            || info.installedVersion == latestItem->text())
-            continue;
-        if (is_release_too_fresh(info))
-            ++fresh;
-        else
+    int pending = 0;
+    for (const PluginInfo &info : m_plugins) {
+        if (needs_update(info))
             ++updatable;
+        if (is_release_pending(info))
+            ++pending;
     }
 
     m_summaryLabel->setText(QStringLiteral("共 %1 个插件，%2 个可更新")
                                 .arg(m_table->rowCount())
                                 .arg(updatable));
     append_log(QStringLiteral("版本查询完成：%1 个可更新").arg(updatable), kColorOk);
-    if (fresh > 0) {
-        // 满屏都是「更新成功但还显示可更新」的困惑就来自这里，单独一条日志说清楚
+    if (pending > 0) {
         append_log(QStringLiteral(
-                       "另有 %1 个插件的最新版发布不足 24 小时（状态列标为「可更新（24h 后可装）」），"
-                       "DSH 的安装策略（minimumReleaseAge = 24h）会暂缓安装刚发布的版本，"
-                       "满 24 小时后再来更新才能真正装上。")
-                       .arg(fresh),
+                       "另有 %1 个插件的最新版发布不足 24 小时，DSH 的安装策略（minimumReleaseAge = 24h）"
+                       "会暂缓安装它，更新时改装其满 24 小时的可用版本（见「可用最新版本」列）。")
+                       .arg(pending),
                    kColorDim);
     }
     if (aborted)
@@ -878,25 +906,6 @@ void MainWindow::on_update_finished(bool aborted)
 
 void MainWindow::begin_update(const QVector<int> &indices)
 {
-    // 最新版发布不足 24h 的项勾选了也不会真正装上新版（DSH minimumReleaseAge 策略），
-    // 更新前挑出来在确认框里一并说明，避免"更新成功但版本没变"的困惑
-    QStringList freshNames;
-    for (int idx : indices) {
-        if (idx < 0 || idx >= m_plugins.size())
-            continue;
-        if (is_release_too_fresh(m_plugins.at(idx)))
-            freshNames << m_plugins.at(idx).packageName;
-    }
-
-    QString extraNote;
-    if (!freshNames.isEmpty()) {
-        extraNote = QStringLiteral(
-                        "\n\n注意：以下 %1 个插件的最新版发布不足 24 小时，DSH 的安装策略\n"
-                        "会暂缓安装（minimumReleaseAge = 24h），本次更新可能装不上最新版：\n%2")
-                        .arg(freshNames.size())
-                        .arg(freshNames.join(QStringLiteral("\n")));
-    }
-
     // DSH 正在运行时更新插件有风险（HMR 状态丢失/文件占用），先确认
     if (check_dsh_running()) {
         const QMessageBox::StandardButton btn = QMessageBox::question(
@@ -905,23 +914,22 @@ void MainWindow::begin_update(const QVector<int> &indices)
             QStringLiteral("检测到 DeepSeek Harness 正在运行。\n\n"
                            "更新插件前建议先完全退出 DSH（托盘图标也退出），\n"
                            "否则可能出现文件占用或状态异常。\n\n"
-                           "是否仍要继续更新？")
-                + extraNote,
+                           "是否仍要继续更新？"),
             QMessageBox::Yes | QMessageBox::No,
             QMessageBox::No);
         if (btn != QMessageBox::Yes)
             return;
-    } else if (!extraNote.isEmpty()) {
-        // DSH 未运行时也弹一次确认：刚发布的版本这次大概率装不上
-        const QMessageBox::StandardButton btn = QMessageBox::question(
-            this,
-            QStringLiteral("部分插件最新版刚发布"),
-            QStringLiteral("即将更新 %1 个插件。").arg(indices.size()) + extraNote
-                + QStringLiteral("\n\n是否仍要继续？"),
-            QMessageBox::Yes | QMessageBox::No,
-            QMessageBox::No);
-        if (btn != QMessageBox::Yes)
-            return;
+    }
+
+    // 最新版未满 24h 的插件改装可用版本：逐条写日志，让实际安装的版本一目了然
+    for (int idx : indices) {
+        if (idx < 0 || idx >= m_plugins.size())
+            continue;
+        const PluginInfo &info = m_plugins.at(idx);
+        if (info.usableVersion != info.latestVersion)
+            append_log(QStringLiteral("%1 最新版 %2 未满 24 小时，本次安装可用版本 %3")
+                           .arg(info.packageName, info.latestVersion, info.usableVersion),
+                       kColorDim);
     }
 
     m_updating = true;
@@ -955,24 +963,52 @@ bool MainWindow::check_dsh_running()
 }
 
 /**
- * @brief 判断某插件的最新版是否"发布太新"（DSH 暂不会安装）。
+ * @brief 判断某插件的最新版是否"尚未满 24 小时"（DSH 暂不会安装它）。
  *
- * DSH 安装插件走 pnpm 并带供应链防护策略 minimumReleaseAge = 24h（分钟单位 1440）：
- * 发布不足 24 小时的版本会被当作不存在，此时执行 dsh plugin add pkg@latest
- * 只会空跑（解析到上一个满足条件的版本，或维持已装版本）。
- * 本函数用查询到的发布时间判断是否落在 24 小时窗口内，供 UI 标注与更新前提示。
- *
- * 注意：发布时间缺失（registry 未返回 time）时不视为"刚发布"——保持原有行为
- * （正常标"可更新"），避免误伤拿不到 time 的 registry/镜像。
- * @param info 插件信息（须已回填 latestVersion / latestTime）
- * @return true = 最新版发布不足 24 小时，更新会空跑
+ * DSH 安装插件走 pnpm 并带供应链防护策略 minimumReleaseAge = 24h：
+ * 发布不足 24 小时的版本会被当作不存在，pkg@latest 会落到更早的版本。
+ * 因此查询脚本会同时给出「可用最新版」（满 24h 的最新稳定版），更新时直接装它。
+ * 本函数只负责界面标注：可用版与最新版不同，且已装版本本身不是最新版。
+ * @param info 插件信息（须已回填 latestVersion / usableVersion / installedVersion）
+ * @return true = 最新版未满 24 小时，界面需要说明
  */
-bool MainWindow::is_release_too_fresh(const PluginInfo &info)
+bool MainWindow::is_release_pending(const PluginInfo &info)
 {
-    if (!info.latestTime.isValid())
-        return false; // 没拿到发布时间，无从判断，按可正常更新处理
-    // QDateTime::currentDateTime() 是本地时间，latestTime 是 UTC，secsTo 会自动换算
-    return info.latestTime.secsTo(QDateTime::currentDateTime()) < 24 * 60 * 60;
+    return !info.latestVersion.isEmpty() && !info.installedVersion.isEmpty()
+           && info.usableVersion != info.latestVersion
+           && info.installedVersion != info.latestVersion;
+}
+
+/**
+ * @brief 判断某插件是否应被标记为可更新（默认勾选、纳入一键更新）。
+ *
+ * 条件：查到了可用版本，且它比已装版本更新。已装版本与可用版相同或更高时不动，
+ * 避免把已装的更高版本降级到较旧的可用版。
+ * @param info 插件信息（须已回填 usableVersion / installedVersion）
+ * @return true = 可用版比已装版本新，可以安装
+ */
+bool MainWindow::needs_update(const PluginInfo &info)
+{
+    return !info.usableVersion.isEmpty() && !info.installedVersion.isEmpty()
+           && PluginManager::compare_versions(info.usableVersion, info.installedVersion) > 0;
+}
+
+/**
+ * @brief 计算主窗口默认尺寸：宽度 = 全部列宽之和 + 非表格区余量，保证默认打开时所有列完整显示。
+ *
+ * 高度固定为 kWindowDefaultHeight。两者都会被当前屏幕的可用区域截断，
+ * 屏幕不够宽时才出现横向滚动条（表格列仍可通过滚动访问）。
+ * @return 默认窗口尺寸
+ */
+QSize MainWindow::default_window_size() const
+{
+    int width = kWindowChromeWidth;
+    for (int c = 0; c < ColCount; ++c)
+        width += m_table->columnWidth(c);
+
+    const QRect avail = QGuiApplication::primaryScreen()->availableGeometry();
+    return QSize(std::min(width, avail.width() - 20),
+                 std::min(kWindowDefaultHeight, avail.height() - 20));
 }
 
 // ===== 辅助函数 =====

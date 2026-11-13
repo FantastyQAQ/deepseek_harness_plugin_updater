@@ -46,7 +46,7 @@ private slots:
     void on_scan_finished(int scanId, bool aborted);
     void on_query_progress(int done, int total);
     void on_query_result(int index, const QString &latestVersion, const QString &error,
-                         const QDateTime &latestTime);
+                         const QDateTime &latestTime, const QString &usableVersion);
     void on_query_finished(bool aborted);
     void on_update_progress(int done, int total);
     void on_update_result(int index, bool ok, const QString &message);
@@ -76,8 +76,10 @@ private:
     void update_select_all_state();
     int checked_count() const;
     QList<int> selected_rows() const;
+    QSize default_window_size() const;
     static bool check_dsh_running();
-    static bool is_release_too_fresh(const PluginInfo &info);
+    static bool is_release_pending(const PluginInfo &info);
+    static bool needs_update(const PluginInfo &info);
 
 private:
     // ---- UI 成员 ----
@@ -118,6 +120,7 @@ private:
         ColProfile,     ///< Profile
         ColSource,      ///< 安装源
         ColInstalled,   ///< 现版本
+        ColUsable,      ///< 可用最新版本
         ColLatest,      ///< 最新版本
         ColStatus,      ///< 状态
         ColDir,         ///< 安装目录

@@ -15,7 +15,8 @@
 //   node npm_dist_tags.js pkg1 pkg2  （也兼容命令行直接给包名）
 //
 // 输出（逐行流式打印，供宿主实时解析）：
-//   <包名>\t<最新版本>\t<发布时间ISO8601>   查询成功（发布时间字段可空）
+//   <包名>\t<最新版本>\t<发布时间ISO8601>\t<可用最新版本>   查询成功（发布时间、可用版本均可空）
+//   可用最新版本：最新版已满 24 小时则等于最新版；否则为满 24 小时的最新稳定版（无则为空）
 //   <包名>\t!<错误信息>                     查询失败（叹号前缀表示失败）
 //
 // 退出码：0（个别包失败不影响退出码，失败信息随行输出）
@@ -134,7 +135,8 @@ function fetchLatest(cfg, pkg) {
           if (!tags.latest) return resolve('!no latest tag');
           // time 表里按版本号取发布时间；个别 registry 可能缺 time，容错为空串
           const time = (j.time && j.time[tags.latest]) || '';
-          resolve(tags.latest + '\t' + time);
+          const usable = pickUsable(j, tags.latest, Date.now());
+          resolve(tags.latest + '\t' + time + '\t' + usable);
         } catch (e) {
           resolve('!parse error');
         }
@@ -143,6 +145,59 @@ function fetchLatest(cfg, pkg) {
     req.on('timeout', () => { req.destroy(); resolve('!timeout'); });
     req.on('error', (e) => resolve('!' + (e.message || 'request error')));
   });
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000; // DSH 的 minimumReleaseAge 策略：发布不足 24 小时不装
+
+/**
+ * 判断某版本发布时间是否已满 24 小时（DSH 才会安装它）。
+ * 无时间信息时视为可装，与界面侧保持一致，避免误伤拿不到 time 的镜像。
+ * @param {string} time ISO 8601 发布时间，可能为空
+ * @param {number} nowMs 当前时间戳（毫秒）
+ * @returns {boolean} true = 已满 24 小时（或无法判断）
+ */
+function isOldEnough(time, nowMs) {
+  if (!time) return true;
+  const t = Date.parse(time);
+  return isNaN(t) || nowMs - t >= DAY_MS;
+}
+
+/**
+ * 比较两个 x.y.z 形式的稳定版本号（逐段按整数比较，缺失段视为 0）。
+ * @param {string} a 版本号
+ * @param {string} b 版本号
+ * @returns {number} a 更新返回正数，相等返回 0，更旧返回负数
+ */
+function compareSemver(a, b) {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+/**
+ * 选出「可安装的最新版」。
+ * latest 已满 24 小时则直接返回 latest；否则在已满 24 小时的稳定版
+ * （x.y.z，不含预发布后缀，且有发布时间）中取语义版本最高者。
+ * @param {Object} j 完整 packument（含 time / versions）
+ * @param {string} latest dist-tags.latest
+ * @param {number} nowMs 当前时间戳（毫秒）
+ * @returns {string} 可用版本号；没有则返回空串
+ */
+function pickUsable(j, latest, nowMs) {
+  const times = j.time || {};
+  if (isOldEnough(times[latest], nowMs)) return latest;
+
+  let best = '';
+  for (const v of Object.keys(j.versions || {})) {
+    if (!/^\d+\.\d+\.\d+$/.test(v) || !times[v]) continue;
+    if (!isOldEnough(times[v], nowMs)) continue;
+    if (!best || compareSemver(v, best) > 0) best = v;
+  }
+  return best;
 }
 
 /**

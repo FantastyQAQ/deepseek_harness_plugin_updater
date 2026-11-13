@@ -209,7 +209,7 @@ void PluginManager::start_query_latest(const QVector<int> &indices)
                 info.latestChecked = true;
                 info.latestFailed = true;
                 info.latestError = QStringLiteral("查询脚本不可用");
-                emit query_result(idx, QString(), info.latestError, QDateTime());
+                emit query_result(idx, QString(), info.latestError, QDateTime(), QString());
                 emit query_progress(++m_queryDone, m_queryTotal);
             }
         }
@@ -262,7 +262,7 @@ void PluginManager::start_query_latest(const QVector<int> &indices)
                     info.latestChecked = true;
                     info.latestFailed = true;
                     info.latestError = msg;
-                    emit query_result(idx, QString(), msg, QDateTime());
+                    emit query_result(idx, QString(), msg, QDateTime(), QString());
                     emit query_progress(++m_queryDone, m_queryTotal);
                 }
             }
@@ -286,7 +286,7 @@ void PluginManager::start_query_latest(const QVector<int> &indices)
                     info.latestFailed = true;
                     info.latestError =
                         QStringLiteral("无法启动 node（请确认已安装 Node.js 且在 PATH 中）");
-                    emit query_result(idx, QString(), info.latestError, QDateTime());
+                    emit query_result(idx, QString(), info.latestError, QDateTime(), QString());
                     emit query_progress(++m_queryDone, m_queryTotal);
                 }
             }
@@ -332,23 +332,23 @@ void PluginManager::handle_query_line(const QString &line)
         return;
 
     const QString pkg = line.left(tab);
-    QString value = line.mid(tab + 1);
+    const QString value = line.mid(tab + 1);
 
     auto it = m_queryPending.find(pkg);
     if (it == m_queryPending.end())
         return; // 未知包名（脚本不该输出），忽略
 
     const bool failed = value.startsWith(QLatin1Char('!'));
-    // 成功行还带第三段：发布时间（ISO 8601，可能缺失）；失败行没有第三段
+    // 成功行字段：最新版 \t 发布时间 ISO（可能为空） \t 可用最新版（可能为空）；失败行只有错误信息
+    QString ver;
     QString timeStr;
+    QString usable;
     if (!failed) {
-        const int tab2 = value.indexOf(QLatin1Char('\t'));
-        if (tab2 >= 0) {
-            timeStr = value.mid(tab2 + 1);
-            value = value.left(tab2);
-        }
+        const QStringList fields = value.split(QStringLiteral("\t"));
+        ver = fields.value(0);
+        timeStr = fields.value(1);
+        usable = fields.value(2);
     }
-    const QString ver = failed ? QString() : value;
     const QString err = failed ? value.mid(1) : QString();
     // ISO 8601 带时区偏移（如 ...Z），fromString 时 Qt::ISODate 可直接解析
     const QDateTime time = timeStr.isEmpty() ? QDateTime() : QDateTime::fromString(timeStr, Qt::ISODate);
@@ -361,13 +361,15 @@ void PluginManager::handle_query_line(const QString &line)
         if (failed) {
             info.latestFailed = true;
             info.latestError = err;
-            emit query_result(idx, QString(), err, QDateTime());
+            info.usableVersion.clear();
+            emit query_result(idx, QString(), err, QDateTime(), QString());
         } else {
             info.latestVersion = ver;
             info.latestTime = time;
+            info.usableVersion = usable;
             info.latestFailed = false;
             info.latestError.clear();
-            emit query_result(idx, ver, QString(), time);
+            emit query_result(idx, ver, QString(), time, usable);
         }
         emit query_progress(++m_queryDone, m_queryTotal);
     }
@@ -393,9 +395,11 @@ void PluginManager::start_update(const QVector<int> &indices)
 
     m_abortFlag = false;
     m_updateQueue.clear();
+    // 只允许 npm 源走更新通道；且必须已查到可用版本，否则无从指定安装目标
     for (int idx : indices)
-        if (idx >= 0 && idx < m_plugins.size() && m_plugins.at(idx).sourceType == SourceNpm)
-            m_updateQueue.append(idx); // 只允许 npm 源走更新通道
+        if (idx >= 0 && idx < m_plugins.size() && m_plugins.at(idx).sourceType == SourceNpm
+            && !m_plugins.at(idx).usableVersion.isEmpty())
+            m_updateQueue.append(idx);
 
     m_updateDone = 0;
     m_updateTotal = m_updateQueue.size();
@@ -431,8 +435,9 @@ void PluginManager::process_next_update()
     }
 
     const PluginInfo info = m_plugins.at(idx);
-    emit log_message(QStringLiteral("正在更新 %1 (%2/%3)…")
+    emit log_message(QStringLiteral("正在更新 %1 → %2 (%3/%4)…")
                          .arg(info.packageName)
+                         .arg(info.usableVersion)
                          .arg(m_updateDone + 1)
                          .arg(m_updateTotal),
                      QColor(Qt::darkGreen));
@@ -490,13 +495,17 @@ void PluginManager::process_next_update()
         }
     });
 
-    // 官方插件更新通道：dsh plugin --profile <name> add <pkg>@latest
+    // 官方插件更新通道：dsh plugin --profile <name> add <pkg>@<目标>
+    // 目标为最新版时沿用 @latest；最新版未满 24h 时 DSH 会暂缓安装它，改为显式装满 24h 的可用版本
+    const QString spec = info.usableVersion == info.latestVersion
+                             ? QStringLiteral("latest")
+                             : info.usableVersion;
     proc->start(QStringLiteral("cmd.exe"),
                 QStringList() << QStringLiteral("/d") << QStringLiteral("/c")
                               << QStringLiteral("dsh.cmd") << QStringLiteral("plugin")
                               << QStringLiteral("--profile") << info.profileName
                               << QStringLiteral("add")
-                              << info.packageName + QStringLiteral("@latest"));
+                              << info.packageName + QStringLiteral("@") + spec);
 }
 
 void PluginManager::finish_update(bool aborted)
@@ -582,6 +591,30 @@ QString PluginManager::read_package_version(const QString &pkgDir)
     if (err.error != QJsonParseError::NoError || !doc.isObject())
         return QString();
     return doc.object().value(QStringLiteral("version")).toString();
+}
+
+/**
+ * @brief 按数字段比较两个版本号（x.y.z，逐段按整数比较，缺失段视为 0）。
+ *
+ * 用于判断可用最新版是否比已装版本更新：只有更新时才需要更新，
+ * 避免把已装的更高版本降级到较旧的可用版。非数字段按 0 处理，
+ * 因此仅适用于稳定版本号（预发布后缀不参与比较）。
+ * @param a 版本号 A
+ * @param b 版本号 B
+ * @return a 更新返回正数，相等返回 0，更旧返回负数
+ */
+int PluginManager::compare_versions(const QString &a, const QString &b)
+{
+    const QStringList pa = a.split(QStringLiteral("."));
+    const QStringList pb = b.split(QStringLiteral("."));
+    const int n = qMax(pa.size(), pb.size());
+    for (int i = 0; i < n; ++i) {
+        const int x = pa.value(i).toInt();
+        const int y = pb.value(i).toInt();
+        if (x != y)
+            return x < y ? -1 : 1;
+    }
+    return 0;
 }
 
 QString PluginManager::last_nonempty_line(const QString &text)
