@@ -45,10 +45,16 @@ compile_commands.json
 *~
 .screenshots/
 
-# ---- 编辑器 / IDE ----
+# ---- 编辑器 / IDE / AI 工具目录（本机配置与助手产物，整目录不入库）----
 .vscode/
 .idea/
 .trae/
+.codebuddy/
+.workbuddy/
+.cursor/
+.claude/
+.qoder/
+.qoder-credits/
 
 # ---- 操作系统杂项 ----
 Thumbs.db
