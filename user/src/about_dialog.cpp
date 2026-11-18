@@ -1,16 +1,23 @@
 /**
- * @file aboutdialog.cpp
+ * @file about_dialog.cpp
  * @brief 「关于」对话框实现：模态展示应用名称 / 版本 / 编译时间 / 作者信息
  */
 
-#include "aboutdialog.h"
+#include "about_dialog.h"
 
-#include "appinfo.h"
+#include "app_info.h"
 
 #include <QLabel>
 #include <QPushButton>
 #include <QVBoxLayout>
 
+/**
+ * @brief       构造关于对话框
+ *
+ * @param[out]  {parent} QWidget* 父窗口
+ * @return      none（构造/析构函数，无返回值）
+ * @doxygen_sig_fp eb29c6acf32f318f
+ */
 AboutDialog::AboutDialog(QWidget *parent)
     : QDialog(parent)
 {

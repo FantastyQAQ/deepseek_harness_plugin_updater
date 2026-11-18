@@ -1,5 +1,5 @@
 /**
- * @file updatenotesdialog.h
+ * @file update_notes_dialog.h
  * @brief 「更新说明」对话框声明
  */
 
@@ -22,8 +22,16 @@ public:
     explicit UpdateNotesDialog(QWidget *parent = nullptr);
 
 private:
-    void loadUpdateNotes();                ///< 读取 :/docs/README.zh_CN.md 并填充浏览器
-    QString notesToHtml(const QString &notes); ///< 极简 Markdown → HTML 转换
+    /**
+     * @brief       /< 读取 :/docs/README.zh_CN.md 并填充浏览器
+     *
+     */
+    void load_update_notes();                ///< 读取 :/docs/README.zh_CN.md 并填充浏览器
+    /**
+     * @brief       /< 极简 Markdown → HTML 转换
+     *
+     */
+    QString notes_to_html(const QString &notes); ///< 极简 Markdown → HTML 转换
 
     QTextBrowser *m_browser = nullptr;     ///< 正文浏览器
 };

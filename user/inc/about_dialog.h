@@ -1,5 +1,5 @@
 /**
- * @file aboutdialog.h
+ * @file about_dialog.h
  * @brief 「关于」对话框声明
  */
 

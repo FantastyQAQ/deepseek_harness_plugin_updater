@@ -1,4 +1,4 @@
-#ifndef PLUGINMANAGER_H
+﻿#ifndef PLUGINMANAGER_H
 #define PLUGINMANAGER_H
 
 #include <QByteArray>
@@ -40,6 +40,7 @@ struct PluginInfo
     bool latestFailed;            ///< 查询失败标记
     QString latestError;         ///< 查询失败原因
 
+    /// @brief 构造：来源类型默认 npm，查询标记清零
     PluginInfo()
         : sourceType(SourceNpm)
         , latestChecked(false)
@@ -64,6 +65,7 @@ class PluginManager : public QObject
 
 public:
     explicit PluginManager(QObject *parent = nullptr);
+    /// @brief 析构函数：终止在跑的子进程
     ~PluginManager() override;
 
     /// @brief 扫描 DSH 用户目录下全部 profile 的已安装插件（同步）
@@ -83,7 +85,7 @@ public:
     void request_abort();
 
     /// @brief 插件列表（扫描完成后有效）
-    const QVector<PluginInfo> &plugins() const { return m_plugins; }
+    const QVector<PluginInfo> &get_plugins() const { return m_plugins; }
 
     /// @brief 按数字段比较两个 x.y.z 版本号
     /// @return a 更新返回正数，相等返回 0，更旧返回负数
@@ -100,29 +102,34 @@ signals:
     void scan_finished(int scanId, bool aborted);
 
     /// @brief 查询进度（done = 已完成个数，0..total）
-    void query_progress(int done, int total);
+    void query_progress_changed(int done, int total);
 
     /// @brief 单个插件查询完成（latestVersion 空 = 失败，原因在 error；latestTime 为最新版发布时间；usableVersion 为可用最新版）
-    void query_result(int index, const QString &latestVersion, const QString &error,
+    void query_result_ready(int index, const QString &latestVersion, const QString &error,
                       const QDateTime &latestTime, const QString &usableVersion);
 
     /// @brief 查询批次结束
     void query_finished(bool aborted);
 
     /// @brief 更新进度（done = 已完成个数，0..total）
-    void update_progress(int done, int total);
+    void update_progress_changed(int done, int total);
 
     /// @brief 单个插件更新完成（message 为输出末行或失败原因）
-    void update_result(int index, bool ok, const QString &message);
+    void update_result_ready(int index, bool ok, const QString &message);
 
     /// @brief 更新批次结束
     void update_finished(bool aborted);
 
 private:
+    /// @brief 从队列取出下一个插件执行更新
     void process_next_update();
+    /// @brief 查询批次收尾：汇总结果并复位状态
     void finish_query(bool aborted);
+    /// @brief 更新批次收尾：汇总结果并复位状态
     void finish_update(bool aborted);
+    /// @brief 结束当前活动的更新子进程
     void kill_active_process();
+    /// @brief 更新前备份插件的 profile 文件
     void backup_profiles(const QVector<int> &indices);
 
     /// @brief 解析查询脚本 stdout 里的一行（"包名\t版本" 或 "包名\t!错误"）
@@ -130,9 +137,12 @@ private:
     /// @brief 确保查询脚本已落地到临时目录，返回可执行脚本路径（失败返回空）
     QString ensure_query_script();
 
+    /// @brief 按安装源字符串判定来源类型
     static PluginSourceType classify_source(const QString &spec);
+    /// @brief 读取包目录中 package.json 的版本号
     static QString read_package_version(const QString &pkgDir);
-    static QString last_nonempty_line(const QString &text);
+    /// @brief 取进程输出中最后一行的非空内容
+    static QString get_last_nonempty_line(const QString &text);
 
 private:
     QVector<PluginInfo> m_plugins;   ///< 插件列表

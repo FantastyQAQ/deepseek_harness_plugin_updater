@@ -1,9 +1,9 @@
 /**
- * @file pluginmanager.cpp
+ * @file plugin_manager.cpp
  * @brief 插件管理器实现：扫描已装插件 / npm view 查最新版 / dsh plugin 官方通道更新
  */
 
-#include "pluginmanager.h"
+#include "plugin_manager.h"
 
 #include <QDateTime>
 #include <QDir>
@@ -23,6 +23,8 @@
 /**
  * @brief 强杀一棵子进程树（cmd.exe → node → pnpm 都要杀干净，避免残留孤儿进程）
  * @param proc 要杀的 QProcess（正在运行时用 taskkill /T /F）
+ * @return      进程已结束返回 true
+ * @doxygen_sig_fp 69cb5133c78db509
  */
 static void kill_process_tree(QProcess *proc)
 {
@@ -41,11 +43,24 @@ static void kill_process_tree(QProcess *proc)
 
 // ===== 构造 / 析构 =====
 
+/**
+ * @brief       构造插件管理器并建立工作线程
+ *
+ * @param[out]  {parent} QObject* 父对象
+ * @return      none（构造/析构函数，无返回值）
+ * @doxygen_sig_fp a2c8be91c813bb17
+ */
 PluginManager::PluginManager(QObject *parent)
     : QObject(parent)
 {
 }
 
+/**
+ * @brief       析构函数：终止在跑的子进程
+ *
+ * @return      none（构造/析构函数，无返回值）
+ * @doxygen_sig_fp 5c2ab6fe9300b321
+ */
 PluginManager::~PluginManager()
 {
     // 析构时若还有子进程在跑（更新 1 个 + 查询 1 个），杀掉并短暂等待收尸，避免句柄泄漏
@@ -62,6 +77,13 @@ PluginManager::~PluginManager()
 
 // ===== 扫描 =====
 
+/**
+ * @brief       扫描 DSH 目录下的全部插件
+ *
+ * @param[in]   {dshHome} const QString& DSH 用户目录
+ * @return      本轮扫描代次
+ * @doxygen_sig_fp 4ab8bc401db1d663
+ */
 int PluginManager::start_scan(const QString &dshHome)
 {
     const int scanId = ++m_scanId;
@@ -149,6 +171,7 @@ int PluginManager::start_scan(const QString &dshHome)
  * 查询脚本编进 qrc（:/scripts/npm_dist_tags.js），运行时需落成一个真实文件
  * 才能交给 node 执行。首次调用写盘，之后复用同一路径（覆盖写，保证与资源同步）。
  * @return 脚本绝对路径；资源缺失或写盘失败返回空串
+ * @doxygen_sig_fp d291954c587975a4
  */
 QString PluginManager::ensure_query_script()
 {
@@ -175,6 +198,13 @@ QString PluginManager::ensure_query_script()
     return path;
 }
 
+/**
+ * @brief       启动版本查询队列
+ *
+ * @param[in]   {indices} const QVector<int>& 待查询的插件下标
+ * @return      none
+ * @doxygen_sig_fp 96b5e9e9776c5372
+ */
 void PluginManager::start_query_latest(const QVector<int> &indices)
 {
     if (m_querying)
@@ -209,8 +239,8 @@ void PluginManager::start_query_latest(const QVector<int> &indices)
                 info.latestChecked = true;
                 info.latestFailed = true;
                 info.latestError = QStringLiteral("查询脚本不可用");
-                emit query_result(idx, QString(), info.latestError, QDateTime(), QString());
-                emit query_progress(++m_queryDone, m_queryTotal);
+                emit query_result_ready(idx, QString(), info.latestError, QDateTime(), QString());
+                emit query_progress_changed(++m_queryDone, m_queryTotal);
             }
         }
         m_queryPending.clear();
@@ -219,7 +249,7 @@ void PluginManager::start_query_latest(const QVector<int> &indices)
     }
 
     m_querying = true;
-    emit query_progress(0, m_queryTotal);
+    emit query_progress_changed(0, m_queryTotal);
 
     auto *proc = new QProcess(this);
     m_queryProc = proc;
@@ -262,8 +292,8 @@ void PluginManager::start_query_latest(const QVector<int> &indices)
                     info.latestChecked = true;
                     info.latestFailed = true;
                     info.latestError = msg;
-                    emit query_result(idx, QString(), msg, QDateTime(), QString());
-                    emit query_progress(++m_queryDone, m_queryTotal);
+                    emit query_result_ready(idx, QString(), msg, QDateTime(), QString());
+                    emit query_progress_changed(++m_queryDone, m_queryTotal);
                 }
             }
             m_queryPending.clear();
@@ -286,8 +316,8 @@ void PluginManager::start_query_latest(const QVector<int> &indices)
                     info.latestFailed = true;
                     info.latestError =
                         QStringLiteral("无法启动 node（请确认已安装 Node.js 且在 PATH 中）");
-                    emit query_result(idx, QString(), info.latestError, QDateTime(), QString());
-                    emit query_progress(++m_queryDone, m_queryTotal);
+                    emit query_result_ready(idx, QString(), info.latestError, QDateTime(), QString());
+                    emit query_progress_changed(++m_queryDone, m_queryTotal);
                 }
             }
             m_queryPending.clear();
@@ -322,6 +352,8 @@ void PluginManager::start_query_latest(const QVector<int> &indices)
  *   "包名\t版本\t发布时间ISO"（成功，时间可为空）或 "包名\t!错误信息"（失败）。
  * 同一包名可能对应多个插件索引（多个 profile 都装了它），都要回填。
  * @param line 不带换行的一行文本
+ * @return      none
+ * @doxygen_sig_fp 9089a71a10463de0
  */
 void PluginManager::handle_query_line(const QString &line)
 {
@@ -362,20 +394,27 @@ void PluginManager::handle_query_line(const QString &line)
             info.latestFailed = true;
             info.latestError = err;
             info.usableVersion.clear();
-            emit query_result(idx, QString(), err, QDateTime(), QString());
+            emit query_result_ready(idx, QString(), err, QDateTime(), QString());
         } else {
             info.latestVersion = ver;
             info.latestTime = time;
             info.usableVersion = usable;
             info.latestFailed = false;
             info.latestError.clear();
-            emit query_result(idx, ver, QString(), time, usable);
+            emit query_result_ready(idx, ver, QString(), time, usable);
         }
-        emit query_progress(++m_queryDone, m_queryTotal);
+        emit query_progress_changed(++m_queryDone, m_queryTotal);
     }
     m_queryPending.erase(it);
 }
 
+/**
+ * @brief       版本查询结束收尾
+ *
+ * @param[in]   {aborted} bool 是否被中止
+ * @return      none
+ * @doxygen_sig_fp 69b976b17c65034d
+ */
 void PluginManager::finish_query(bool aborted)
 {
     if (!m_querying)
@@ -388,6 +427,13 @@ void PluginManager::finish_query(bool aborted)
 
 // ===== 更新（串行队列）=====
 
+/**
+ * @brief       启动更新队列
+ *
+ * @param[in]   {indices} const QVector<int>& 待更新的插件下标
+ * @return      none
+ * @doxygen_sig_fp 195e18ec32159d1e
+ */
 void PluginManager::start_update(const QVector<int> &indices)
 {
     if (m_updating)
@@ -414,10 +460,16 @@ void PluginManager::start_update(const QVector<int> &indices)
     // 更新前备份涉及的 profile package.json（与 DSH 自身 bak-* 惯例一致）
     backup_profiles(m_updateQueue);
 
-    emit update_progress(0, m_updateTotal);
+    emit update_progress_changed(0, m_updateTotal);
     process_next_update();
 }
 
+/**
+ * @brief       处理队列中的下一个更新任务
+ *
+ * @return      none
+ * @doxygen_sig_fp 08699c5f1f553b3d
+ */
 void PluginManager::process_next_update()
 {
     if (!m_updating)
@@ -457,14 +509,14 @@ void PluginManager::process_next_update()
             const bool ok = (exitCode == 0);
             QString msg;
             if (ok) {
-                msg = last_nonempty_line(out); // 成功时取输出末行（通常是 pnpm 的 Done 行）
+                msg = get_last_nonempty_line(out); // 成功时取输出末行（通常是 pnpm 的 Done 行）
             } else {
-                msg = last_nonempty_line(err);
+                msg = get_last_nonempty_line(err);
                 if (msg.isEmpty())
                     msg = QStringLiteral("dsh plugin 退出码 %1").arg(exitCode);
             }
-            emit update_result(idx, ok, msg);
-            emit update_progress(++m_updateDone, m_updateTotal);
+            emit update_result_ready(idx, ok, msg);
+            emit update_progress_changed(++m_updateDone, m_updateTotal);
         }
         QTimer::singleShot(0, this, &PluginManager::process_next_update);
     });
@@ -478,9 +530,9 @@ void PluginManager::process_next_update()
             m_activeProc = nullptr;
 
         if (m_updating && !m_abortFlag && idx >= 0 && idx < m_plugins.size()) {
-            emit update_result(idx, false,
+            emit update_result_ready(idx, false,
                                QStringLiteral("无法启动 dsh.cmd（请确认 DSH CLI 已安装且在 PATH 中）"));
-            emit update_progress(++m_updateDone, m_updateTotal);
+            emit update_progress_changed(++m_updateDone, m_updateTotal);
         }
         QTimer::singleShot(0, this, &PluginManager::process_next_update);
     });
@@ -508,6 +560,13 @@ void PluginManager::process_next_update()
                               << info.packageName + QStringLiteral("@") + spec);
 }
 
+/**
+ * @brief       更新结束收尾
+ *
+ * @param[in]   {aborted} bool 是否被中止
+ * @return      none
+ * @doxygen_sig_fp f0e2f9495b717ddb
+ */
 void PluginManager::finish_update(bool aborted)
 {
     if (!m_updating)
@@ -519,6 +578,12 @@ void PluginManager::finish_update(bool aborted)
 
 // ===== 中止 / 辅助 =====
 
+/**
+ * @brief       请求中止当前扫描或更新
+ *
+ * @return      none
+ * @doxygen_sig_fp d52315b4fa273c65
+ */
 void PluginManager::request_abort()
 {
     m_abortFlag = true;
@@ -526,6 +591,12 @@ void PluginManager::request_abort()
     kill_active_process();
 }
 
+/**
+ * @brief       结束当前活动子进程
+ *
+ * @return      none
+ * @doxygen_sig_fp cfd125018c8ee11c
+ */
 void PluginManager::kill_active_process()
 {
     // 更新严格串行，只有 m_activeProc 一个；查询是单个 node 脚本进程
@@ -533,6 +604,13 @@ void PluginManager::kill_active_process()
     kill_process_tree(m_queryProc);
 }
 
+/**
+ * @brief       更新前备份插件的 profile 文件
+ *
+ * @param[in]   {indices} const QVector<int>& 待更新的插件下标
+ * @return      none
+ * @doxygen_sig_fp c881477ca110ecd5
+ */
 void PluginManager::backup_profiles(const QVector<int> &indices)
 {
     // 去重收集涉及的 profile，更新前各备份一份 package.json
@@ -559,6 +637,13 @@ void PluginManager::backup_profiles(const QVector<int> &indices)
     }
 }
 
+/**
+ * @brief       按安装源字符串判定来源类型
+ *
+ * @param[in]   {spec} const QString& 安装源字符串
+ * @return      判定出的来源类型
+ * @doxygen_sig_fp 78471b0d70c8900b
+ */
 PluginSourceType PluginManager::classify_source(const QString &spec)
 {
     const QString s = spec.trimmed();
@@ -581,6 +666,13 @@ PluginSourceType PluginManager::classify_source(const QString &spec)
     return SourceNpm; // 其余按 semver 范围（^1.2.3 等）视为 npm 源
 }
 
+/**
+ * @brief       读取包目录中 package.json 的版本号
+ *
+ * @param[in]   {pkgDir} const QString& 包目录
+ * @return      版本号文本，失败为空串
+ * @doxygen_sig_fp 0a37ad0e642f85b9
+ */
 QString PluginManager::read_package_version(const QString &pkgDir)
 {
     QFile f(pkgDir + QStringLiteral("/package.json"));
@@ -602,6 +694,7 @@ QString PluginManager::read_package_version(const QString &pkgDir)
  * @param a 版本号 A
  * @param b 版本号 B
  * @return a 更新返回正数，相等返回 0，更旧返回负数
+ * @doxygen_sig_fp 93edb767a7a73827
  */
 int PluginManager::compare_versions(const QString &a, const QString &b)
 {
@@ -617,7 +710,14 @@ int PluginManager::compare_versions(const QString &a, const QString &b)
     return 0;
 }
 
-QString PluginManager::last_nonempty_line(const QString &text)
+/**
+ * @brief       取文本中最后一行的非空内容
+ *
+ * @param[in]   {text} const QString& 进程输出文本
+ * @return      最后一行非空文本，没有则空串
+ * @doxygen_sig_fp 3a0bbf3953206414
+ */
+QString PluginManager::get_last_nonempty_line(const QString &text)
 {
     // Qt 5.12 用 QString::SkipEmptyParts（Qt 5.14 起才改名 Qt::SkipEmptyParts）
     const QStringList lines = text.split(QRegularExpression(QStringLiteral("[\\r\\n]+")),

@@ -1,9 +1,9 @@
-/**
- * @file mainwindow.cpp
+﻿/**
+ * @file main_window.cpp
  * @brief 主窗口实现：布局 / QSS 主题 / 表格交互 / 扫描-查询-更新状态机
  */
 
-#include "mainwindow.h"
+#include "main_window.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -33,9 +33,9 @@
 
 #include <algorithm>
 
-#include "aboutdialog.h"
-#include "appinfo.h"
-#include "updatenotesdialog.h"
+#include "about_dialog.h"
+#include "app_info.h"
+#include "update_notes_dialog.h"
 
 // ===== 日志颜色常量（与参考工程一致的柔和色板）=====
 namespace {
@@ -54,6 +54,7 @@ const int kWindowDefaultHeight = 1200; ///< 默认窗口高度
  * @param fm 表格所用字体的度量
  * @param texts 表头文字与代表性样例内容
  * @return 列宽（像素）
+ * @doxygen_sig_fp f8b4eadabd994f4c
  */
 int fit_column(const QFontMetrics &fm, const QStringList &texts)
 {
@@ -66,6 +67,13 @@ int fit_column(const QFontMetrics &fm, const QStringList &texts)
 
 // ===== 构造 / 析构 =====
 
+/**
+ * @brief       构造主窗口：建管理器、搭界面并连接信号
+ *
+ * @param[out]  {parent} QWidget* 父窗口
+ * @return      none（构造/析构函数，无返回值）
+ * @doxygen_sig_fp 755a2b28c15df9d3
+ */
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
@@ -80,24 +88,36 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_manager, &PluginManager::log_message, this, &MainWindow::append_log);
     connect(m_manager, &PluginManager::scan_list_ready, this, &MainWindow::on_scan_list_ready);
     connect(m_manager, &PluginManager::scan_finished, this, &MainWindow::on_scan_finished);
-    connect(m_manager, &PluginManager::query_progress, this, &MainWindow::on_query_progress);
-    connect(m_manager, &PluginManager::query_result, this, &MainWindow::on_query_result);
+    connect(m_manager, &PluginManager::query_progress_changed, this, &MainWindow::on_query_progress_changed);
+    connect(m_manager, &PluginManager::query_result_ready, this, &MainWindow::on_query_result_ready);
     connect(m_manager, &PluginManager::query_finished, this, &MainWindow::on_query_finished);
-    connect(m_manager, &PluginManager::update_progress, this, &MainWindow::on_update_progress);
-    connect(m_manager, &PluginManager::update_result, this, &MainWindow::on_update_result);
+    connect(m_manager, &PluginManager::update_progress_changed, this, &MainWindow::on_update_progress_changed);
+    connect(m_manager, &PluginManager::update_result_ready, this, &MainWindow::on_update_result_ready);
     connect(m_manager, &PluginManager::update_finished, this, &MainWindow::on_update_finished);
 
     // 记住窗口标题基名，操作时在后面追加动态信息
     m_summaryLabel->setText(QStringLiteral("就绪 — 点击「开始扫描」索引 DSH 插件"));
 
-    resize(default_window_size());
+    resize(get_default_window_size());
     setMinimumSize(860, 520);
 }
 
+/**
+ * @brief       析构函数（默认实现，控件由 Qt 父子关系释放）
+ *
+ * @return      none（构造/析构函数，无返回值）
+ * @doxygen_sig_fp a84ef10cd3716d34
+ */
 MainWindow::~MainWindow() = default;
 
 // ===== UI 构建 =====
 
+/**
+ * @brief       搭建主窗口整体界面框架
+ *
+ * @return      none
+ * @doxygen_sig_fp 86fc58ce8be6edb3
+ */
 void MainWindow::setup_ui()
 {
     auto *central = new QWidget(this);
@@ -233,6 +253,13 @@ void MainWindow::setup_ui()
 
 // ===== 工具栏 =====
 
+/**
+ * @brief       创建顶部工具栏按钮行
+ *
+ * @param[out]  {top} QVBoxLayout* 顶部纵向布局
+ * @return      none
+ * @doxygen_sig_fp bdd3ad3919796b71
+ */
 void MainWindow::setup_tool_bar(QVBoxLayout *top)
 {
     auto *toolBar = new QWidget();
@@ -281,7 +308,7 @@ void MainWindow::setup_tool_bar(QVBoxLayout *top)
         update_select_all_state();
         m_summaryLabel->setText(QStringLiteral("共 %1 个插件，%2 个选中")
                                      .arg(m_table->rowCount())
-                                     .arg(checked_count()));
+                                     .arg(get_checked_count()));
     });
     bar->addWidget(m_selectAllCb);
 
@@ -312,11 +339,17 @@ void MainWindow::setup_tool_bar(QVBoxLayout *top)
     connect(m_exitBtn, &QPushButton::clicked, this, &MainWindow::on_exit);
     bar->addWidget(m_exitBtn);
 
-    tool_bar_button_font();
+    apply_tool_bar_button_font();
     top->addWidget(toolBar);
 }
 
-void MainWindow::tool_bar_button_font()
+/**
+ * @brief       统一放大工具栏按钮字号
+ *
+ * @return      none
+ * @doxygen_sig_fp 4785d58a26a063a2
+ */
+void MainWindow::apply_tool_bar_button_font()
 {
     QFont f = QApplication::font();
     if (f.pointSizeF() > 0)
@@ -337,6 +370,13 @@ void MainWindow::tool_bar_button_font()
 
 // ===== DSH 目录行 =====
 
+/**
+ * @brief       创建 DSH 用户目录输入行
+ *
+ * @param[out]  {top} QVBoxLayout* 顶部纵向布局
+ * @return      none
+ * @doxygen_sig_fp 68c363462fba248e
+ */
 void MainWindow::setup_dir_row(QVBoxLayout *top)
 {
     auto *row = new QHBoxLayout();
@@ -368,6 +408,13 @@ void MainWindow::setup_dir_row(QVBoxLayout *top)
 
 // ===== 表格面板 =====
 
+/**
+ * @brief       创建插件表格面板
+ *
+ * @param[out]  {splitter} QSplitter* 上下分栏容器
+ * @return      none
+ * @doxygen_sig_fp d807e9cc42c9cfd7
+ */
 void MainWindow::setup_table_panel(QSplitter *splitter)
 {
     // 面板容器：加圆角边框，让「表格区」成为清晰的方框，与下方日志区的分界一目了然
@@ -442,6 +489,13 @@ void MainWindow::setup_table_panel(QSplitter *splitter)
 
 // ===== 日志面板 =====
 
+/**
+ * @brief       创建日志面板
+ *
+ * @param[out]  {splitter} QSplitter* 上下分栏容器
+ * @return      none
+ * @doxygen_sig_fp 967c6072a86c20ea
+ */
 void MainWindow::setup_log_panel(QSplitter *splitter)
 {
     // 面板容器：与表格区同款圆角方框，形成上下两块清晰的分界
@@ -469,6 +523,13 @@ void MainWindow::setup_log_panel(QSplitter *splitter)
 
 // ===== 图例 =====
 
+/**
+ * @brief       创建状态图例
+ *
+ * @param[out]  {top} QVBoxLayout* 顶部纵向布局
+ * @return      none
+ * @doxygen_sig_fp 0159077a74f88db3
+ */
 void MainWindow::setup_legend(QVBoxLayout *top)
 {
     m_legend = new QLabel();
@@ -484,6 +545,12 @@ void MainWindow::setup_legend(QVBoxLayout *top)
 
 // ===== 状态栏 =====
 
+/**
+ * @brief       创建状态栏（摘要 + 进度条）
+ *
+ * @return      none
+ * @doxygen_sig_fp ae25a04a32918f73
+ */
 void MainWindow::setup_status_bar()
 {
     m_summaryLabel = new QLabel(QStringLiteral("就绪"));
@@ -497,6 +564,14 @@ void MainWindow::setup_status_bar()
 
 // ===== 日志 =====
 
+/**
+ * @brief       追加一行带颜色的日志
+ *
+ * @param[in]   {text} const QString& 日志文本
+ * @param[in]   {color} const QColor& 文本颜色
+ * @return      none
+ * @doxygen_sig_fp 7460c47fa016223c
+ */
 void MainWindow::append_log(const QString &text, const QColor &color)
 {
     const QString html = QStringLiteral("<span style='color:%1;'>%2</span>")
@@ -515,6 +590,12 @@ void MainWindow::append_log(const QString &text, const QColor &color)
 
 // ===== 工具栏动作 =====
 
+/**
+ * @brief       开始扫描 DSH 插件目录
+ *
+ * @return      none
+ * @doxygen_sig_fp 147e3a4447ce022c
+ */
 void MainWindow::on_start_scan()
 {
     if (m_scanning || m_querying || m_updating)
@@ -541,6 +622,12 @@ void MainWindow::on_start_scan()
     m_manager->start_scan(home);
 }
 
+/**
+ * @brief       更新勾选的插件
+ *
+ * @return      none
+ * @doxygen_sig_fp 248c795bb7181738
+ */
 void MainWindow::on_update_selected()
 {
     if (m_scanning || m_querying || m_updating)
@@ -559,6 +646,12 @@ void MainWindow::on_update_selected()
     begin_update(indices);
 }
 
+/**
+ * @brief       更新全部可更新插件
+ *
+ * @return      none
+ * @doxygen_sig_fp 2d741e324a7e5ede
+ */
 void MainWindow::on_update_all()
 {
     if (m_scanning || m_querying || m_updating)
@@ -568,7 +661,7 @@ void MainWindow::on_update_all()
     // 最新版未满 24h 的项也纳入，更新时改装其满 24h 的可用版本
     QVector<int> indices;
     for (int r = 0; r < m_table->rowCount(); ++r)
-        if (needs_update(m_plugins.at(r)))
+        if (check_needs_update(m_plugins.at(r)))
             indices.append(r);
 
     if (indices.isEmpty()) {
@@ -579,6 +672,12 @@ void MainWindow::on_update_all()
     begin_update(indices);
 }
 
+/**
+ * @brief       请求停止当前扫描或更新
+ *
+ * @return      none
+ * @doxygen_sig_fp 4580e21835f4d255
+ */
 void MainWindow::on_stop()
 {
     m_manager->request_abort();
@@ -587,6 +686,13 @@ void MainWindow::on_stop()
 
 // ===== 表格交互 =====
 
+/**
+ * @brief       首列勾选变化后同步全选框
+ *
+ * @param[out]  {item} QTableWidgetItem* 发生变化的单元格
+ * @return      none
+ * @doxygen_sig_fp 20a41f449dd29d00
+ */
 void MainWindow::on_table_item_changed(QTableWidgetItem *item)
 {
     if (!item || item->column() != ColCheck || m_syncingSelectAll)
@@ -595,9 +701,16 @@ void MainWindow::on_table_item_changed(QTableWidgetItem *item)
     update_select_all_state();
     m_summaryLabel->setText(QStringLiteral("共 %1 个插件，%2 个选中")
                                 .arg(m_table->rowCount())
-                                .arg(checked_count()));
+                                .arg(get_checked_count()));
 }
 
+/**
+ * @brief       弹出表格右键菜单
+ *
+ * @param[in]   {pos} const QPoint& 右键点击位置
+ * @return      none
+ * @doxygen_sig_fp 5509136069130d53
+ */
 void MainWindow::on_table_context_menu(const QPoint &pos)
 {
     const QTableWidgetItem *item = m_table->itemAt(pos);
@@ -605,7 +718,7 @@ void MainWindow::on_table_context_menu(const QPoint &pos)
         return;
 
     // 优先取选中的行集合，空则回退到右键点击行
-    QList<int> rows = selected_rows();
+    QList<int> rows = get_selected_rows();
     if (rows.isEmpty())
         rows.append(item->row());
     std::sort(rows.begin(), rows.end());
@@ -648,6 +761,14 @@ void MainWindow::on_table_context_menu(const QPoint &pos)
 
 // ===== 扫描/查询/更新信号处理 =====
 
+/**
+ * @brief       按扫描结果填充表格
+ *
+ * @param[in]   {scanId} int 扫描代次
+ * @param[in]   {plugins} const QVector<PluginInfo>& 扫描到的插件列表
+ * @return      none
+ * @doxygen_sig_fp c96954e3dd0357e2
+ */
 void MainWindow::on_scan_list_ready(int scanId, const QVector<PluginInfo> &plugins)
 {
     Q_UNUSED(scanId);
@@ -701,6 +822,14 @@ void MainWindow::on_scan_list_ready(int scanId, const QVector<PluginInfo> &plugi
     update_select_all_state();
 }
 
+/**
+ * @brief       扫描结束：恢复按钮并汇总
+ *
+ * @param[in]   {scanId} int 扫描代次
+ * @param[in]   {aborted} bool 是否被中止
+ * @return      none
+ * @doxygen_sig_fp 0909728d5cb376a6
+ */
 void MainWindow::on_scan_finished(int scanId, bool aborted)
 {
     Q_UNUSED(scanId);
@@ -742,13 +871,32 @@ void MainWindow::on_scan_finished(int scanId, bool aborted)
     m_manager->start_query_latest(npmIndices);
 }
 
-void MainWindow::on_query_progress(int done, int total)
+/**
+ * @brief       刷新版本查询进度
+ *
+ * @param[in]   {done} int 已查询数
+ * @param[in]   {total} int 待查询总数
+ * @return      none
+ * @doxygen_sig_fp 70ba4c54fd30daee
+ */
+void MainWindow::on_query_progress_changed(int done, int total)
 {
     m_progress->setValue(done);
     m_summaryLabel->setText(QStringLiteral("正在查询最新版本 %1/%2 …").arg(done).arg(total));
 }
 
-void MainWindow::on_query_result(int index, const QString &latestVersion, const QString &error,
+/**
+ * @brief       回填单个插件的版本查询结果
+ *
+ * @param[in]   {index} int 插件行号
+ * @param[in]   {latestVersion} const QString& 最新版本
+ * @param[in]   {error} const QString& 查询失败原因
+ * @param[in]   {latestTime} const QDateTime& 最新版本发布时间
+ * @param[in]   {usableVersion} const QString& 满 24h 后可用的版本
+ * @return      none
+ * @doxygen_sig_fp 17e5e84241c0e96b
+ */
+void MainWindow::on_query_result_ready(int index, const QString &latestVersion, const QString &error,
                                  const QDateTime &latestTime, const QString &usableVersion)
 {
     if (index < 0 || index >= m_table->rowCount())
@@ -781,8 +929,8 @@ void MainWindow::on_query_result(int index, const QString &latestVersion, const 
     latestItem->setText(latestVersion);
     usableItem->setText(usableVersion.isEmpty() ? QStringLiteral("—") : usableVersion);
 
-    const bool pending = is_release_pending(info);
-    if (needs_update(info)) {
+    const bool pending = check_release_pending(info);
+    if (check_needs_update(info)) {
         // 可更新：默认勾选；最新版未满 24h 时更新的是其可用版本
         statusItem->setText(pending ? QStringLiteral("可更新（最新版 24h 后可装）")
                                     : QStringLiteral("可更新"));
@@ -812,6 +960,13 @@ void MainWindow::on_query_result(int index, const QString &latestVersion, const 
               .arg(latestVersion, when, usableVersion));
 }
 
+/**
+ * @brief       版本查询结束：恢复按钮并汇总
+ *
+ * @param[in]   {aborted} bool 是否被中止
+ * @return      none
+ * @doxygen_sig_fp 5c115594c66d8d8a
+ */
 void MainWindow::on_query_finished(bool aborted)
 {
     m_querying = false;
@@ -822,9 +977,9 @@ void MainWindow::on_query_finished(bool aborted)
     int updatable = 0;
     int pending = 0;
     for (const PluginInfo &info : m_plugins) {
-        if (needs_update(info))
+        if (check_needs_update(info))
             ++updatable;
-        if (is_release_pending(info))
+        if (check_release_pending(info))
             ++pending;
     }
 
@@ -847,13 +1002,30 @@ void MainWindow::on_query_finished(bool aborted)
     update_select_all_state();
 }
 
-void MainWindow::on_update_progress(int done, int total)
+/**
+ * @brief       刷新更新进度
+ *
+ * @param[in]   {done} int 已更新数
+ * @param[in]   {total} int 待更新总数
+ * @return      none
+ * @doxygen_sig_fp 85bbc645dc8b3e2e
+ */
+void MainWindow::on_update_progress_changed(int done, int total)
 {
     m_progress->setValue(done);
     m_summaryLabel->setText(QStringLiteral("正在更新 %1/%2 …").arg(done).arg(total));
 }
 
-void MainWindow::on_update_result(int index, bool ok, const QString &message)
+/**
+ * @brief       回填单个插件的更新结果
+ *
+ * @param[in]   {index} int 插件行号
+ * @param[in]   {ok} bool 是否成功
+ * @param[in]   {message} const QString& 结果说明
+ * @return      none
+ * @doxygen_sig_fp 971e0d8c3379b4f2
+ */
+void MainWindow::on_update_result_ready(int index, bool ok, const QString &message)
 {
     if (index < 0 || index >= m_table->rowCount())
         return;
@@ -878,6 +1050,13 @@ void MainWindow::on_update_result(int index, bool ok, const QString &message)
     }
 }
 
+/**
+ * @brief       更新结束：恢复按钮并提示重启
+ *
+ * @param[in]   {aborted} bool 是否被中止
+ * @return      none
+ * @doxygen_sig_fp 8e4f71835b86f5df
+ */
 void MainWindow::on_update_finished(bool aborted)
 {
     m_updating = false;
@@ -904,6 +1083,13 @@ void MainWindow::on_update_finished(bool aborted)
 
 // ===== 更新启动（含 DSH 运行检测）=====
 
+/**
+ * @brief       校验前置条件后启动更新队列
+ *
+ * @param[in]   {indices} const QVector<int>& 待更新的插件行号
+ * @return      none
+ * @doxygen_sig_fp 2e64f4e82557687b
+ */
 void MainWindow::begin_update(const QVector<int> &indices)
 {
     // DSH 正在运行时更新插件有风险（HMR 状态丢失/文件占用），先确认
@@ -949,6 +1135,12 @@ void MainWindow::begin_update(const QVector<int> &indices)
     m_manager->start_update(indices);
 }
 
+/**
+ * @brief       DSH 是否正在运行（运行中禁止更新）
+ *
+ * @return      检测到进程在运行返回 true
+ * @doxygen_sig_fp 2852ac725ef8a120
+ */
 bool MainWindow::check_dsh_running()
 {
     // 用 tasklist 静默探测 DeepSeek Harness.exe 进程
@@ -971,8 +1163,9 @@ bool MainWindow::check_dsh_running()
  * 本函数只负责界面标注：可用版与最新版不同，且已装版本本身不是最新版。
  * @param info 插件信息（须已回填 latestVersion / usableVersion / installedVersion）
  * @return true = 最新版未满 24 小时，界面需要说明
+ * @doxygen_sig_fp 0467a34d9374569c
  */
-bool MainWindow::is_release_pending(const PluginInfo &info)
+bool MainWindow::check_release_pending(const PluginInfo &info)
 {
     return !info.latestVersion.isEmpty() && !info.installedVersion.isEmpty()
            && info.usableVersion != info.latestVersion
@@ -986,8 +1179,9 @@ bool MainWindow::is_release_pending(const PluginInfo &info)
  * 避免把已装的更高版本降级到较旧的可用版。
  * @param info 插件信息（须已回填 usableVersion / installedVersion）
  * @return true = 可用版比已装版本新，可以安装
+ * @doxygen_sig_fp d3cc13e1cd9f21d1
  */
-bool MainWindow::needs_update(const PluginInfo &info)
+bool MainWindow::check_needs_update(const PluginInfo &info)
 {
     return !info.usableVersion.isEmpty() && !info.installedVersion.isEmpty()
            && PluginManager::compare_versions(info.usableVersion, info.installedVersion) > 0;
@@ -999,8 +1193,9 @@ bool MainWindow::needs_update(const PluginInfo &info)
  * 高度固定为 kWindowDefaultHeight。两者都会被当前屏幕的可用区域截断，
  * 屏幕不够宽时才出现横向滚动条（表格列仍可通过滚动访问）。
  * @return 默认窗口尺寸
+ * @doxygen_sig_fp 71a0dba705cea592
  */
-QSize MainWindow::default_window_size() const
+QSize MainWindow::get_default_window_size() const
 {
     int width = kWindowChromeWidth;
     for (int c = 0; c < ColCount; ++c)
@@ -1013,6 +1208,13 @@ QSize MainWindow::default_window_size() const
 
 // ===== 辅助函数 =====
 
+/**
+ * @brief       在资源管理器中打开插件目录
+ *
+ * @param[in]   {row} int 插件行号
+ * @return      none
+ * @doxygen_sig_fp 004cceca35bcc0c6
+ */
 void MainWindow::open_plugin_dir(int row)
 {
     if (row < 0 || row >= m_plugins.size())
@@ -1026,6 +1228,14 @@ void MainWindow::open_plugin_dir(int row)
     QDesktopServices::openUrl(QUrl::fromLocalFile(path));
 }
 
+/**
+ * @brief       批量设置指定行的勾选状态
+ *
+ * @param[in]   {rows} const QList<int>& 行号列表
+ * @param[in]   {checked} bool 是否勾选
+ * @return      none
+ * @doxygen_sig_fp 00dd3000bb785b52
+ */
 void MainWindow::set_rows_checked(const QList<int> &rows, bool checked)
 {
     m_syncingSelectAll = true;
@@ -1037,13 +1247,19 @@ void MainWindow::set_rows_checked(const QList<int> &rows, bool checked)
     update_select_all_state();
     m_summaryLabel->setText(QStringLiteral("共 %1 个插件，%2 个选中")
                                 .arg(m_table->rowCount())
-                                .arg(checked_count()));
+                                .arg(get_checked_count()));
 }
 
+/**
+ * @brief       根据各行勾选情况同步全选框
+ *
+ * @return      none
+ * @doxygen_sig_fp 5d8cd862211f5de9
+ */
 void MainWindow::update_select_all_state()
 {
     const int total = m_table->rowCount();
-    const int checked = checked_count();
+    const int checked = get_checked_count();
 
     m_syncingSelectAll = true;
     if (total == 0 || checked == 0)
@@ -1055,7 +1271,13 @@ void MainWindow::update_select_all_state()
     m_syncingSelectAll = false;
 }
 
-int MainWindow::checked_count() const
+/**
+ * @brief       当前勾选的插件数量
+ *
+ * @return      已勾选行数
+ * @doxygen_sig_fp b2d6d1d2af19b5ea
+ */
+int MainWindow::get_checked_count() const
 {
     int n = 0;
     for (int r = 0; r < m_table->rowCount(); ++r)
@@ -1064,7 +1286,13 @@ int MainWindow::checked_count() const
     return n;
 }
 
-QList<int> MainWindow::selected_rows() const
+/**
+ * @brief       当前勾选的行号列表
+ *
+ * @return      已勾选行号列表
+ * @doxygen_sig_fp 1938e6783ab25b09
+ */
+QList<int> MainWindow::get_selected_rows() const
 {
     QList<int> rows;
     const QList<QTableWidgetItem *> items = m_table->selectedItems();
@@ -1080,12 +1308,24 @@ QList<int> MainWindow::selected_rows() const
 
 // ===== 关于 / 更新说明 / 退出 =====
 
+/**
+ * @brief       打开关于对话框
+ *
+ * @return      none
+ * @doxygen_sig_fp e119773229ac67b1
+ */
 void MainWindow::on_about()
 {
     AboutDialog dlg(this);
     dlg.exec();
 }
 
+/**
+ * @brief       打开更新说明窗口
+ *
+ * @return      none
+ * @doxygen_sig_fp 5c3241c9b94a7b48
+ */
 void MainWindow::on_update_notes()
 {
     if (!m_updateNotesWnd) {
@@ -1101,6 +1341,12 @@ void MainWindow::on_update_notes()
     }
 }
 
+/**
+ * @brief       退出程序
+ *
+ * @return      none
+ * @doxygen_sig_fp 6ac6ca72c74e2d7b
+ */
 void MainWindow::on_exit()
 {
     qApp->quit();

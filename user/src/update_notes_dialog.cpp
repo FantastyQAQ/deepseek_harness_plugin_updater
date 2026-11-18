@@ -1,9 +1,9 @@
 /**
- * @file updatenotesdialog.cpp
+ * @file update_notes_dialog.cpp
  * @brief 「更新说明」对话框实现：非模态窗口，展示 README 中的更新记录
  */
 
-#include "updatenotesdialog.h"
+#include "update_notes_dialog.h"
 
 #include <QFile>
 #include <QLabel>
@@ -11,6 +11,13 @@
 #include <QTextBrowser>
 #include <QVBoxLayout>
 
+/**
+ * @brief       构造更新说明窗口并载入 README
+ *
+ * @param[out]  {parent} QWidget* 父窗口
+ * @return      none（构造/析构函数，无返回值）
+ * @doxygen_sig_fp e2b3e5e74db5f0fc
+ */
 UpdateNotesDialog::UpdateNotesDialog(QWidget *parent)
     : QWidget(parent, Qt::Window)
 {
@@ -50,13 +57,19 @@ UpdateNotesDialog::UpdateNotesDialog(QWidget *parent)
     btnRow->addWidget(closeBtn);
     layout->addLayout(btnRow);
 
-    loadUpdateNotes();
+    load_update_notes();
 
     resize(900, 700);
     setMinimumSize(520, 400);
 }
 
-void UpdateNotesDialog::loadUpdateNotes()
+/**
+ * @brief       读取资源里的 README 并填入浏览器
+ *
+ * @return      none
+ * @doxygen_sig_fp bf699bb06b89b562
+ */
+void UpdateNotesDialog::load_update_notes()
 {
     // 从嵌入资源读取 README，截取「# 更新记录」之后的部分
     QFile file(QStringLiteral(":/docs/README.zh_CN.md"));
@@ -67,13 +80,23 @@ void UpdateNotesDialog::loadUpdateNotes()
     }
 
     const int pos = notes.indexOf(QStringLiteral("# 更新记录"));
-    if (pos >= 0)
-        notes = notes.mid(pos);
+    if (pos >= 0) {
+        // 跳过「# 更新记录」标题行本身：窗口顶部已有同名标题，正文里不再重复显示
+        const int lineEnd = notes.indexOf(QLatin1Char('\n'), pos);
+        notes = (lineEnd >= 0) ? notes.mid(lineEnd + 1) : QString();
+    }
 
-    m_browser->setHtml(notesToHtml(notes));
+    m_browser->setHtml(notes_to_html(notes));
 }
 
-QString UpdateNotesDialog::notesToHtml(const QString &notes)
+/**
+ * @brief       把更新记录 Markdown 转成可显示的 HTML
+ *
+ * @param[in]   {notes} const QString& 原始 Markdown 文本
+ * @return      转换后的 HTML 文本
+ * @doxygen_sig_fp 757958a31d99c2b4
+ */
+QString UpdateNotesDialog::notes_to_html(const QString &notes)
 {
     // 极简 Markdown 转换：标题/粗体/行内代码，反引号用等宽着色
     QString html = notes.toHtmlEscaped();

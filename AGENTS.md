@@ -24,6 +24,8 @@
 - **函数内部注释要充分**：函数体内要有足够详细的注释，描述实现逻辑和各段代码的具体功能；关键分支、状态切换、边界处理等位置必须有注释说明。**不允许出现大段代码没有一句注释的情况。**
 - **源文件（.c/.cpp 等）中的注释要详细**：函数定义和重要代码定义处，须以注释块详细描述其功能、设计目标、适用场景、注意事项（如调用时机、线程/中断上下文限制、参数取值范围、副作用等）。**源文件的注释必须使用 `doxygen-comment` 技能生成/维护**（Doxygen 风格），不要手工随意编写。
 - **头文件（.h 等）中的注释要简略**：头文件中的函数声明不需要大段说明，以单行简略注释为主，说清"这个函数是做什么的"即可，详细说明留在源文件中。
+- **函数命名统一 snake_case**：函数名全小写、用下划线分隔、以"动词 + 名词"结构命名（如 `scan_repos`、`append_log`、`run_git`）；判断类函数用 `check_` 前缀（如 `check_github_repo`），返回 bool 不用 `is_` 开头；取单个值/状态的访问函数用 `get_` 前缀（如 `get_options`、`get_cache_path`）；Qt 信号命名同样遵循 snake_case + 动宾结构（如 `log_message`、`progress_changed`）；槽函数用 `on_` 前缀（如 `on_scan`、`on_pull_all`）。禁止在函数命名中使用 camelCase / PascalCase；Qt 虚函数重写保持基类名不变；成员变量仍用 `m_` 前缀，类型与常量命名不受此条约束。
+- **源码文件命名同样统一 snake_case**：文件名全小写、下划线分隔（如 `key_manager.c`、`app_config.h`），禁止 camelCase / PascalCase 的文件名（如 `keyManager.c`、`AppConfig.h`）；新增文件同样按此命名。
 
 ## 行为准则
 
@@ -202,13 +204,12 @@ Qt Creator 自身不会带 `sh.exe`，所以在 Qt Creator 里构建正常；只
 
 ```
 dsh_plugin_updater.pro           qmake 工程文件（源文件清单、图标资源、PRE_LINK 版本资源重生成）
-dsh_plugin_updater_resource.rc   Windows 资源：exe 图标 + VERSIONINFO（宏来自 appinfo.h）
+dsh_plugin_updater_resource.rc   Windows 资源：exe 图标 + VERSIONINFO（宏来自 app_info.h）
 resources.qrc                    Qt 资源：内嵌 docs/README.zh_CN.md 与 icon/app_256.ico
 user/inc/                        头文件（注释从简，单行说明用途）
 user/src/                        源文件（Doxygen 注释，详细描述实现）
 icon/app_256.ico                 应用图标（同时被 .rc 与 .qrc 引用）
 docs/README.zh_CN.md             更新记录（编译进资源，供「更新说明」窗口读取）
-docs/implementation_plan.md      原始实现计划（分任务分步骤，含完整代码快照）
 release/ debug/                  构建产物（已被 .gitignore 忽略）
 .screenshots/                    界面截图（已被 .gitignore 忽略）
 ```
@@ -217,16 +218,16 @@ release/ debug/                  构建产物（已被 .gitignore 忽略）
 
 | 路径 | 职责 |
 |------|------|
-| `user/inc/appinfo.h` | 应用名 / 版本号 / 作者 / 构建日期等全部元信息宏，被窗口标题、关于对话框、VERSIONINFO 共同引用 |
+| `user/inc/app_info.h` | 应用名 / 版本号 / 作者 / 构建日期等全部元信息宏，被窗口标题、关于对话框、VERSIONINFO 共同引用 |
 | `user/src/main.cpp` | 入口：设 Fusion 风格、创建并显示 `MainWindow` |
-| `user/inc/mainwindow.h`、`user/src/mainwindow.cpp` | 主窗口：工具栏 + DSH 目录行 + 表格/日志分栏 + 图例 + 状态栏，QSS 主题内联在此文件 |
-| `user/inc/pluginmanager.h`、`user/src/pluginmanager.cpp` | 核心逻辑：扫描 profile、`npm view` 查最新版、`dsh plugin add` 更新；查询与更新各是一条 QProcess 串行队列 |
-| `user/src/aboutdialog.cpp` | 模态「关于」对话框 |
-| `user/src/updatenotesdialog.cpp` | 非模态「更新说明」窗口，读 `:/docs/README.zh_CN.md` 并做极简 Markdown→HTML |
+| `user/inc/main_window.h`、`user/src/main_window.cpp` | 主窗口：工具栏 + DSH 目录行 + 表格/日志分栏 + 图例 + 状态栏，QSS 主题内联在此文件 |
+| `user/inc/plugin_manager.h`、`user/src/plugin_manager.cpp` | 核心逻辑：扫描 profile、`npm view` 查最新版、`dsh plugin add` 更新；查询与更新各是一条 QProcess 串行队列 |
+| `user/src/about_dialog.cpp` | 模态「关于」对话框 |
+| `user/src/update_notes_dialog.cpp` | 非模态「更新说明」窗口，读 `:/docs/README.zh_CN.md` 并做极简 Markdown→HTML |
 
 ### 版本号维护（只在发布时升版）
 
-`user/inc/appinfo.h` 里三个宏的职责与更新时机不同，不要一改代码就无脑升版：
+`user/inc/app_info.h` 里三个宏的职责与更新时机不同，不要一改代码就无脑升版：
 
 - `APP_VERSION`：显示版本号 `SV01.NNN`。**只在发布版本时**递增末三位（如 `SV01.001` → `SV01.002`）。
 - `APP_VERSION_NUM`：数字版本号，必须与 `APP_VERSION` 末三位一一对应（`SV01.002` → `1,0,0,2`），与 `APP_VERSION` 同时改。
@@ -240,13 +241,13 @@ release/ debug/                  构建产物（已被 .gitignore 忽略）
 
 拿不准是否算发布时，按小改动处理，并在收尾时提醒用户「本次未升版本号，如需发版请告知」。
 
-本工程对应：三个宏均在 `user/inc/appinfo.h`，名称与通用规则一致。
+本工程对应：三个宏均在 `user/inc/app_info.h`，名称与通用规则一致。
 
 派生关系与构建联动（改上面三个就够，别去动这些）：
 
 - `APP_FULL_TITLE` = `APP_NAME " " APP_VERSION " [" APP_BUILD_DATE "]"`，用于主窗口标题。
 - `APP_PRODUCT_VERSION` = `APP_VERSION " [" APP_BUILD_DATE "]"`，用于 exe 属性里的「产品版本」。
-- `dsh_plugin_updater_resource.rc` 直接 `#include "user/inc/appinfo.h"`，`FILEVERSION` / `PRODUCTVERSION` 取 `APP_VERSION_NUM`，`FileVersion` 取 `APP_VERSION`，`ProductVersion` 取 `APP_PRODUCT_VERSION`——所以三个宏一改，exe 属性自动跟着变，不用手改 .rc。
+- `dsh_plugin_updater_resource.rc` 直接 `#include "user/inc/app_info.h"`，`FILEVERSION` / `PRODUCTVERSION` 取 `APP_VERSION_NUM`，`FileVersion` 取 `APP_VERSION`，`ProductVersion` 取 `APP_PRODUCT_VERSION`——所以三个宏一改，exe 属性自动跟着变，不用手改 .rc。
 - `.pro` 的 `QMAKE_PRE_LINK` 会在**每次链接前**重跑 windres 生成 `$(RES_FILE)`，因此只改宏、不做完整重编也能让 exe 属性刷新；但源码改动仍需正常编译。
 - 发版改宏后按「README 更新」一节，在 `docs/README.zh_CN.md` 追加一条当次更新记录（该文件编进资源，需重编才在「更新说明」窗口里可见）。
 
