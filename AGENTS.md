@@ -210,6 +210,9 @@ user/inc/                        头文件（注释从简，单行说明用途�
 user/src/                        源文件（Doxygen 注释，详细描述实现）
 icon/app_256.ico                 应用图标（同时被 .rc 与 .qrc 引用）
 docs/README.zh_CN.md             更新记录（编译进资源，供「更新说明」窗口读取）
+scripts/                         发布脚本（publish.ps1 签名清单）与服务器脚本
+update_keys/                     清单签名密钥对（整目录已被 .gitignore 排除，勿外传）
+publish_info/                    发布产物 latest.json / .sig（已被 .gitignore 忽略）
 release/ debug/                  构建产物（已被 .gitignore 忽略）
 .screenshots/                    界面截图（已被 .gitignore 忽略）
 ```

@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="windows-1252"?>
 <>
   <InputFile>E:\code\qt\deepseek_harness_plugin_updater\release\dsh_plugin_updater.exe</InputFile>
-  <OutputFile>E:\code\qt\deepseek_harness_plugin_updater\pack\dsh_plugin_updater_boxed.exe</OutputFile>
+  <OutputFile>E:\code\qt\deepseek_harness_plugin_updater\pack\dsh_plugin_updater_SV01.011.exe</OutputFile>
   <Files>
     <Enabled>True</Enabled>
     <DeleteExtractedOnExit>False</DeleteExtractedOnExit>
@@ -277,6 +277,18 @@
             <Type>2</Type>
             <Name>Qt5Gui.dll</Name>
             <File>E:\code\qt\deepseek_harness_plugin_updater\pack\app_32\Qt5Gui.dll</File>
+            <ActiveX>False</ActiveX>
+            <ActiveXInstall>False</ActiveXInstall>
+            <Action>0</Action>
+            <OverwriteDateTime>False</OverwriteDateTime>
+            <OverwriteAttributes>False</OverwriteAttributes>
+            <PassCommandLine>False</PassCommandLine>
+            <HideFromDialogs>0</HideFromDialogs>
+          </File>
+          <File>
+            <Type>2</Type>
+            <Name>Qt5Network.dll</Name>
+            <File>E:\code\qt\deepseek_harness_plugin_updater\pack\app_32\Qt5Network.dll</File>
             <ActiveX>False</ActiveX>
             <ActiveXInstall>False</ActiveXInstall>
             <Action>0</Action>

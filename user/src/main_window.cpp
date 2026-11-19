@@ -35,6 +35,7 @@
 
 #include "about_dialog.h"
 #include "app_info.h"
+#include "online_update_dialog.h"
 #include "update_notes_dialog.h"
 
 // ===== 日志颜色常量（与参考工程一致的柔和色板）=====
@@ -323,6 +324,15 @@ void MainWindow::setup_tool_bar(QVBoxLayout *top)
     connect(m_aboutBtn, &QPushButton::clicked, this, &MainWindow::on_about);
     bar->addWidget(m_aboutBtn);
 
+    m_onlineUpdateBtn = new QPushButton(QStringLiteral("在线更新"));
+    m_onlineUpdateBtn->setCursor(Qt::PointingHandCursor);
+    // 橙色系：与「关于」的蓝、「更新说明」的绿区分开，提示这是一条会改动程序的通道
+    m_onlineUpdateBtn->setStyleSheet(QStringLiteral(
+        "QPushButton { background: #fff4e0; border-color: #f5d9a8; color: #b36b00; }"
+        "QPushButton:hover { background: #ffe9c2; border-color: #e8b766; }"));
+    connect(m_onlineUpdateBtn, &QPushButton::clicked, this, &MainWindow::on_online_update);
+    bar->addWidget(m_onlineUpdateBtn);
+
     m_updateNotesBtn = new QPushButton(QStringLiteral("更新说明"));
     m_updateNotesBtn->setCursor(Qt::PointingHandCursor);
     m_updateNotesBtn->setStyleSheet(QStringLiteral(
@@ -363,6 +373,7 @@ void MainWindow::apply_tool_bar_button_font()
                     static_cast<QWidget *>(m_stopBtn),
                     static_cast<QWidget *>(m_selectAllCb),
                     static_cast<QWidget *>(m_aboutBtn),
+                    static_cast<QWidget *>(m_onlineUpdateBtn),
                     static_cast<QWidget *>(m_updateNotesBtn),
                     static_cast<QWidget *>(m_exitBtn)})
         w->setFont(f);
@@ -1339,6 +1350,31 @@ void MainWindow::on_update_notes()
         m_updateNotesWnd->raise();
         m_updateNotesWnd->activateWindow();
     }
+}
+
+/**
+ * @brief       打开在线更新窗口
+ *
+ * 传入「插件更新任务是否在跑」的判定回调：在线更新启动新版本前需要确认
+ * 没有插件更新任务占用 node_modules 与子进程，否则容易留下半截状态。
+ * @return      none
+ * @doxygen_sig_fp d9a8748ef6d15878
+ */
+void MainWindow::on_online_update()
+{
+    OnlineUpdateDialog dlg([this]() { return check_update_busy(); }, this);
+    dlg.exec();
+}
+
+/**
+ * @brief       当前是否有插件更新任务在跑
+ *
+ * @return      扫描、查询或更新任一进行中即返回 true
+ * @doxygen_sig_fp b1fff1aad07299e2
+ */
+bool MainWindow::check_update_busy() const
+{
+    return m_scanning || m_querying || m_updating;
 }
 
 /**

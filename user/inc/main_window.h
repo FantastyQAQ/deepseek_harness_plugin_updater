@@ -18,6 +18,7 @@
 
 class AboutDialog;
 class UpdateNotesDialog;
+class OnlineUpdateDialog;
 
 /// @brief 主窗口：工具栏 + DSH 目录行 + 表格/日志分栏 + 图例 + 状态栏
 ///
@@ -128,6 +129,11 @@ private slots:
      */
     void on_update_notes();
     /**
+     * @brief       打开在线更新窗口
+     *
+     */
+    void on_online_update();
+    /**
      * @brief       退出程序
      *
      */
@@ -218,6 +224,11 @@ private:
      */
     QSize get_default_window_size() const;
     /**
+     * @brief       当前是否有插件更新任务在跑（在线更新启动新版前需确认）
+     *
+     */
+    bool check_update_busy() const;
+    /**
      * @brief       DSH 是否正在运行（运行中禁止更新）
      *
      */
@@ -249,6 +260,7 @@ private:
     QCheckBox *m_selectAllCb = nullptr;           ///< 全选（三态）
 
     QPushButton *m_aboutBtn = nullptr;            ///< 关于
+    QPushButton *m_onlineUpdateBtn = nullptr;    ///< 在线更新
     QPushButton *m_updateNotesBtn = nullptr;     ///< 更新说明
     QPushButton *m_exitBtn = nullptr;              ///< 退出
 

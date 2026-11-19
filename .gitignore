@@ -45,6 +45,19 @@ compile_commands.json
 *~
 .screenshots/
 
+# ---- 发布密钥与签名产物（私钥/清单绝不能入库）----
+# update_keys/ 存放清单签名用的 RSA 密钥对（私钥 + 公钥），
+# 私钥泄露等于他人可推送任意更新，必须整目录排除。
+# 显式写目录名而不只依赖 *.pem：避免将来在该目录放入其它后缀文件时漏网。
+update_keys/
+*.pem
+*.key
+*.sig
+publish_info/
+# 允许发布脚本本身入库
+!scripts/publish.ps1
+!scripts/setup_server.sh
+
 # ---- 编辑器 / IDE / AI 工具目录（本机配置与助手产物，整目录不入库）----
 .vscode/
 .idea/
@@ -67,3 +80,9 @@ desktop.ini
 # 便携版（exe + Qt 运行库），需要进版本库，这里做例外放行。
 !pack/
 !pack/**
+
+# packaged release exes (large binaries, not source)
+/pack/*.exe
+
+# bundled Qt runtime for EVB packaging
+/pack/app_32/
